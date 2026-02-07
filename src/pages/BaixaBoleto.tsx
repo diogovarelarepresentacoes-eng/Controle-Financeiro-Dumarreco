@@ -24,22 +24,13 @@ export default function BaixaBoleto() {
 
   const darBaixa = () => {
     if (!selecionado) return
-    if (origem === 'dinheiro') {
-      if (saldoDinheiro < selecionado.valor) {
-        alert(`Saldo em dinheiro insuficiente. Saldo disponível: ${formatMoney(saldoDinheiro)}. Valor do boleto: ${formatMoney(selecionado.valor)}.`)
-        return
-      }
+    if (origem === 'dinheiro' && saldoDinheiro < selecionado.valor) {
+      alert(`Saldo em dinheiro insuficiente. Saldo disponível: ${formatMoney(saldoDinheiro)}. Valor do boleto: ${formatMoney(selecionado.valor)}.`)
+      return
     }
-    if (origem === 'conta_banco') {
-      if (!contaBancoId) {
-        alert('Selecione a conta banco de origem do pagamento.')
-        return
-      }
-      const conta = contas.find((c) => c.id === contaBancoId)
-      if (conta && conta.saldoAtual < selecionado.valor) {
-        alert(`Saldo insuficiente na conta "${conta.nome}". Saldo disponível: ${formatMoney(conta.saldoAtual)}. Valor do boleto: ${formatMoney(selecionado.valor)}.`)
-        return
-      }
+    if (origem === 'conta_banco' && !contaBancoId) {
+      alert('Selecione a conta banco de origem do pagamento.')
+      return
     }
     registrarBaixaBoleto(selecionado, origem, origem === 'conta_banco' ? contaBancoId : undefined)
     setSelecionado(null)
@@ -206,7 +197,7 @@ export default function BaixaBoleto() {
               onClick={darBaixa}
               disabled={
                 (origem === 'dinheiro' && saldoDinheiro < selecionado.valor) ||
-                (origem === 'conta_banco' && contaBancoId !== '' && (contas.find((c) => c.id === contaBancoId)?.saldoAtual ?? 0) < selecionado.valor)
+                (origem === 'conta_banco' && !contaBancoId)
               }
             >
               Confirmar baixa

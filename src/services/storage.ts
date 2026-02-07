@@ -103,11 +103,16 @@ export const storageMovimentacoes = {
   getAll: getMovimentacoes,
   getByConta: (contaBancoId: string) =>
     getMovimentacoes().filter((m) => m.contaBancoId === contaBancoId),
+  getByVendaId: (vendaId: string) =>
+    getMovimentacoes().filter((m) => m.vendaId === vendaId),
   add: (mov: MovimentacaoBancaria) => {
     const list = getMovimentacoes();
     list.push(mov);
     setMovimentacoes(list);
     return mov;
+  },
+  delete: (id: string) => {
+    setMovimentacoes(getMovimentacoes().filter((m) => m.id !== id));
   },
 };
 
@@ -199,4 +204,25 @@ export function registrarVenda(venda: Venda): Venda {
     atualizarSaldoConta(venda.contaBancoId, venda.valor, 'entrada');
   }
   return venda;
+}
+
+/** Reverte o efeito da venda no saldo da conta (remove movimentação e estorna). */
+function reverterMovimentacaoVenda(vendaId: string) {
+  const movs = storageMovimentacoes.getByVendaId(vendaId);
+  for (const m of movs) {
+    atualizarSaldoConta(m.contaBancoId, m.valor, 'saida');
+    storageMovimentacoes.delete(m.id);
+  }
+}
+
+/** Atualiza uma venda existente: reverte movimentação antiga (se houver), salva e aplica nova. */
+export function atualizarVenda(venda: Venda): Venda {
+  const antiga = storageVendas.getById(venda.id);
+  if (antiga) {
+    const formaCartaoOuPixAntiga = antiga.formaPagamento === 'pix' || antiga.formaPagamento === 'debito' || antiga.formaPagamento === 'credito';
+    if (formaCartaoOuPixAntiga && antiga.contaBancoId) {
+      reverterMovimentacaoVenda(antiga.id);
+    }
+  }
+  return registrarVenda(venda);
 }

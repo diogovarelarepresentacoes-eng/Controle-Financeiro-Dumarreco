@@ -1,22 +1,25 @@
 import { useState, useEffect } from 'react'
 import type { Venda, FormaPagamentoVenda } from '../types'
-import { storageVendas, storageContas, registrarVenda } from '../services/storage'
-import { applyCurrencyMask, parseCurrencyFromInput } from '../utils/currencyMask'
+import { storageVendas, storageContas, registrarVenda, atualizarVenda } from '../services/storage'
+import { applyCurrencyMask, parseCurrencyFromInput, formatCurrencyForInput } from '../utils/currencyMask'
 import { format } from 'date-fns'
 import ptBR from 'date-fns/locale/pt-BR'
 
 const FORMAS: FormaPagamentoVenda[] = ['pix', 'dinheiro', 'debito', 'credito']
 
+const emptyForm = {
+  descricao: '',
+  valor: '',
+  formaPagamento: 'pix' as FormaPagamentoVenda,
+  contaBancoId: '',
+}
+
 export default function Vendas() {
   const [vendas, setVendas] = useState<Venda[]>([])
   const [contas, setContas] = useState(storageContas.getAll().filter((c) => c.ativo))
   const [modalOpen, setModalOpen] = useState(false)
-  const [form, setForm] = useState({
-    descricao: '',
-    valor: '',
-    formaPagamento: 'pix' as FormaPagamentoVenda,
-    contaBancoId: '',
-  })
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState(emptyForm)
 
   const load = () => {
     setVendas(storageVendas.getAll())
@@ -26,6 +29,23 @@ export default function Vendas() {
   useEffect(() => {
     load()
   }, [])
+
+  const openNew = () => {
+    setEditingId(null)
+    setForm(emptyForm)
+    setModalOpen(true)
+  }
+
+  const openEdit = (v: Venda) => {
+    setEditingId(v.id)
+    setForm({
+      descricao: v.descricao,
+      valor: formatCurrencyForInput(v.valor),
+      formaPagamento: v.formaPagamento,
+      contaBancoId: v.contaBancoId ?? '',
+    })
+    setModalOpen(true)
+  }
 
   const exigeContaBanco = form.formaPagamento === 'pix' || form.formaPagamento === 'debito' || form.formaPagamento === 'credito'
 
@@ -37,18 +57,24 @@ export default function Vendas() {
       alert('Selecione a conta banco que recebeu o pagamento (PIX, débito e crédito).')
       return
     }
-    const data = new Date().toISOString().slice(0, 10)
+    const data = editingId ? (storageVendas.getById(editingId)?.data ?? new Date().toISOString().slice(0, 10)) : new Date().toISOString().slice(0, 10)
+    const criadoEm = editingId ? (storageVendas.getById(editingId)?.criadoEm ?? new Date().toISOString()) : new Date().toISOString()
     const venda: Venda = {
-      id: crypto.randomUUID(),
+      id: editingId ?? crypto.randomUUID(),
       descricao: form.descricao.trim(),
       valor,
       formaPagamento: form.formaPagamento,
       contaBancoId: exigeContaBanco ? form.contaBancoId : undefined,
       data,
-      criadoEm: new Date().toISOString(),
+      criadoEm,
     }
-    registrarVenda(venda)
-    setForm({ descricao: '', valor: '', formaPagamento: 'pix', contaBancoId: '' })
+    if (editingId) {
+      atualizarVenda(venda)
+    } else {
+      registrarVenda(venda)
+    }
+    setForm(emptyForm)
+    setEditingId(null)
     setModalOpen(false)
     load()
   }
@@ -69,7 +95,7 @@ export default function Vendas() {
         Registre vendas com a forma de pagamento: <strong>PIX</strong>, <strong>Dinheiro</strong>, <strong>Débito</strong> ou <strong>Crédito</strong>. Vendas em PIX, débito e crédito podem ser vinculadas a uma conta banco para atualizar o saldo.
       </p>
       <div style={{ marginBottom: 20 }}>
-        <button type="button" className="btn btn-primary" onClick={() => setModalOpen(true)}>
+        <button type="button" className="btn btn-primary" onClick={openNew}>
           Nova venda
         </button>
       </div>
@@ -96,12 +122,13 @@ export default function Vendas() {
               <th>Valor</th>
               <th>Forma de pagamento</th>
               <th>Conta (PIX/Déb/Créd)</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {vendas.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
+                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
                   Nenhuma venda registrada. Clique em &quot;Nova venda&quot; para começar.
                 </td>
               </tr>
@@ -121,6 +148,11 @@ export default function Vendas() {
                     ? contas.find((c) => c.id === v.contaBancoId)?.nome ?? '-'
                     : '-'}
                 </td>
+                <td>
+                  <button type="button" className="btn btn-secondary" onClick={() => openEdit(v)}>
+                    Editar
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -128,9 +160,9 @@ export default function Vendas() {
       </div>
 
       {modalOpen && (
-        <div className="modal-overlay" onClick={() => setModalOpen(false)}>
+        <div className="modal-overlay" onClick={() => { setModalOpen(false); setEditingId(null); setForm(emptyForm) }}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Nova venda</h2>
+            <h2>{editingId ? 'Editar venda' : 'Nova venda'}</h2>
             <form onSubmit={submit}>
               <div className="form-group">
                 <label>Descrição</label>
@@ -192,11 +224,11 @@ export default function Vendas() {
                 </div>
               )}
               <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setModalOpen(false); setEditingId(null); setForm(emptyForm) }}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Registrar venda
+                  {editingId ? 'Salvar' : 'Registrar venda'}
                 </button>
               </div>
             </form>
