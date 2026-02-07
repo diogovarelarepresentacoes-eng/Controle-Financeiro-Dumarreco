@@ -3,6 +3,25 @@
  * Suporta o layout padrão da NFe (Portal da Nota Fiscal Eletrônica).
  */
 
+/** Código tPag da NFe e descrição (layout NFe 4.0) */
+export const NF_TIPOS_PAGAMENTO: Record<string, string> = {
+  '01': 'Dinheiro',
+  '02': 'Cheque',
+  '03': 'Cartão de Crédito',
+  '04': 'Cartão de Débito',
+  '05': 'Crédito Loja',
+  '10': 'Vale Alimentação',
+  '11': 'Vale Refeição',
+  '12': 'Vale Presente',
+  '13': 'Vale Combustível',
+  '15': 'Boleto',
+  '16': 'Depósito Bancário',
+  '17': 'PIX',
+  '18': 'Transferência',
+  '19': 'Programa de fidelidade',
+  '99': 'Outros',
+}
+
 export interface NFeDados {
   descricao: string
   valor: number
@@ -11,6 +30,10 @@ export interface NFeDados {
   dEmi?: string
   xNomeEmit?: string
   natOp?: string
+  /** Código da forma de pagamento no XML (tPag), quando existir */
+  tPag?: string
+  /** Descrição amigável da forma de pagamento (ex: "Cartão de Crédito") */
+  formaPagamentoDesc?: string
 }
 
 function getTextoTag(xml: string, tag: string): string | undefined {
@@ -48,6 +71,9 @@ export function parseNFeXml(xml: string): NFeDados | null {
   const valor = parseFloat((vNF || '0').replace(',', '.'))
   if (isNaN(valor) || valor <= 0) return null
 
+  const tPag = getTextoTag(xml, 'tPag')
+  const formaPagamentoDesc = tPag ? (NF_TIPOS_PAGAMENTO[tPag] ?? `Pagamento (${tPag})`) : undefined
+
   const numeroNFe = nNF || 'NFe'
   const emitente = xNome || ''
   const natureza = natOp || ''
@@ -61,6 +87,8 @@ export function parseNFeXml(xml: string): NFeDados | null {
     dEmi,
     xNomeEmit: xNome,
     natOp,
+    tPag,
+    formaPagamentoDesc,
   }
 }
 
