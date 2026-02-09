@@ -470,4 +470,19 @@ tr:hover td {
     font-size: 0.8rem;
     color: #333 !important;
   }
+
+  .faturamento-page .card {
+    background: #fff;
+    color: #111;
+    border-color: #333;
+  }
+
+  .faturamento-page .card h2,
+  .faturamento-page .card h3,
+  .faturamento-page .relatorio-periodo {
+    color: #111;
+  }
+
+  .faturamento-page .saldo-positivo { color: #0a7d4d; }
+  .faturamento-page .saldo-negativo { color: #c41e2a; }
 }

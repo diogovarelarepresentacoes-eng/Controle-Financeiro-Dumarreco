@@ -1,16 +1,18 @@
-import type { ContaBanco, Boleto, MovimentacaoBancaria, Venda } from '../types';
+import type { ContaBanco, Boleto, MovimentacaoBancaria, Venda, FaturamentoMensal } from '../types';
 
 const KEY_CONTAS = 'controle-financeiro-contas';
 const KEY_BOLETOS = 'controle-financeiro-boletos';
 const KEY_MOVIMENTACOES = 'controle-financeiro-movimentacoes';
 const KEY_VENDAS = 'controle-financeiro-vendas';
+const KEY_FATURAMENTO_MENSAL = 'controle-financeiro-faturamento-mensal';
 
-/** Remove todos os dados do sistema (contas, boletos, movimentações, vendas). Use para iniciar sem dados de teste. */
+/** Remove todos os dados do sistema. */
 export function zerarBancoDeDados(): void {
   localStorage.removeItem(KEY_CONTAS);
   localStorage.removeItem(KEY_BOLETOS);
   localStorage.removeItem(KEY_MOVIMENTACOES);
   localStorage.removeItem(KEY_VENDAS);
+  localStorage.removeItem(KEY_FATURAMENTO_MENSAL);
 }
 
 function getContas(): ContaBanco[] {
@@ -64,6 +66,39 @@ function getVendas(): Venda[] {
 function setVendas(vendas: Venda[]) {
   localStorage.setItem(KEY_VENDAS, JSON.stringify(vendas));
 }
+
+function getFaturamentoMensal(): FaturamentoMensal[] {
+  try {
+    const data = localStorage.getItem(KEY_FATURAMENTO_MENSAL);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+function setFaturamentoMensal(list: FaturamentoMensal[]) {
+  localStorage.setItem(KEY_FATURAMENTO_MENSAL, JSON.stringify(list));
+}
+
+export const storageFaturamentoMensal = {
+  getAll: getFaturamentoMensal,
+  getByAnoMes: (ano: number, mes: number) =>
+    getFaturamentoMensal().find((f) => f.ano === ano && f.mes === mes),
+  save: (item: FaturamentoMensal) => {
+    const list = getFaturamentoMensal();
+    const idx = list.findIndex((f) => f.id === item.id);
+    const now = new Date().toISOString();
+    const toSave = { ...item, atualizadoEm: now };
+    if (!toSave.criadoEm) toSave.criadoEm = now;
+    if (idx >= 0) list[idx] = toSave;
+    else list.push(toSave);
+    setFaturamentoMensal(list);
+    return toSave;
+  },
+  delete: (id: string) => {
+    setFaturamentoMensal(getFaturamentoMensal().filter((f) => f.id !== id));
+  },
+};
 
 export const storageContas = {
   getAll: getContas,

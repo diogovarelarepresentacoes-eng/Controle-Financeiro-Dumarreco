@@ -5,6 +5,7 @@ import Boletos from './pages/Boletos'
 import BaixaBoleto from './pages/BaixaBoleto'
 import Vendas from './pages/Vendas'
 import Relatorios from './pages/Relatorios'
+import Faturamento from './pages/Faturamento'
 import Configuracoes from './pages/Configuracoes'
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
           <NavLink to="/boletos">Boletos</NavLink>
           <NavLink to="/baixa-boleto">Baixa de Boleto</NavLink>
           <NavLink to="/relatorios">Relatórios</NavLink>
+          <NavLink to="/faturamento">Faturamento</NavLink>
           <NavLink to="/configuracoes">Configurações</NavLink>
         </nav>
       </aside>
@@ -32,6 +34,7 @@ function App() {
           <Route path="/boletos" element={<Boletos />} />
           <Route path="/baixa-boleto" element={<BaixaBoleto />} />
           <Route path="/relatorios" element={<Relatorios />} />
+          <Route path="/faturamento" element={<Faturamento />} />
           <Route path="/configuracoes" element={<Configuracoes />} />
         </Routes>
       </main>
