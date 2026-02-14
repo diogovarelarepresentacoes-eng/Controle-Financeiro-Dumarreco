@@ -51,7 +51,8 @@ export default function Dashboard() {
   const [boletos] = useState(() => storageBoletos.getAll())
   const [mesCalendario, setMesCalendario] = useState(() => new Date())
 
-  const totalSaldoBancario = contas.reduce((s, c) => s + c.saldoAtual, 0)
+  const contasHabilitadas = contas.filter((c) => c.ativo)
+  const totalSaldoBancario = contasHabilitadas.reduce((s, c) => s + c.saldoAtual, 0)
   const saldoDinheiro = getSaldoDinheiro()
   const boletosPendentes = boletos.filter((b) => !b.pago)
   const totalPendente = boletosPendentes.reduce((s, b) => s + b.valor, 0)
@@ -146,11 +147,11 @@ export default function Dashboard() {
             {formatMoney(totalSaldoBancario)}
           </div>
           <p style={{ marginTop: 8, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Soma do saldo atual de todas as contas banco
+            Soma do saldo real de todas as contas banco habilitadas
           </p>
         </div>
         <div className="card-saldo">
-          <h3>Saldo em dinheiro</h3>
+          <h3>Caixa Interno</h3>
           <div className={`valor ${saldoDinheiro >= 0 ? 'saldo-positivo' : 'saldo-negativo'}`}>
             {formatMoney(saldoDinheiro)}
           </div>

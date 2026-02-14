@@ -5,6 +5,7 @@ const KEY_BOLETOS = 'controle-financeiro-boletos';
 const KEY_MOVIMENTACOES = 'controle-financeiro-movimentacoes';
 const KEY_VENDAS = 'controle-financeiro-vendas';
 const KEY_FATURAMENTO_MENSAL = 'controle-financeiro-faturamento-mensal';
+const KEY_DESPESAS = 'controle-financeiro-despesas';
 
 /** Remove todos os dados do sistema. */
 export function zerarBancoDeDados(): void {
@@ -13,6 +14,7 @@ export function zerarBancoDeDados(): void {
   localStorage.removeItem(KEY_MOVIMENTACOES);
   localStorage.removeItem(KEY_VENDAS);
   localStorage.removeItem(KEY_FATURAMENTO_MENSAL);
+  localStorage.removeItem(KEY_DESPESAS);
 }
 
 function getContas(): ContaBanco[] {

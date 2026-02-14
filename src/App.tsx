@@ -1,14 +1,20 @@
-import { Routes, Route, NavLink } from 'react-router-dom'
+import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
 import ContaBanco from './pages/ContaBanco'
 import Boletos from './pages/Boletos'
 import BaixaBoleto from './pages/BaixaBoleto'
 import Vendas from './pages/Vendas'
-import Relatorios from './pages/Relatorios'
+import RelatorioVendas from './pages/RelatorioVendas'
+import RelatorioBoletosPagos from './pages/RelatorioBoletosPagos'
 import Faturamento from './pages/Faturamento'
 import Configuracoes from './pages/Configuracoes'
+import Despesas from './pages/Despesas'
+import { ROTA_DESPESAS } from './modules/despesas/routes'
 
 function App() {
+  const location = useLocation()
+  const relatoriosAtivo = location.pathname.startsWith('/relatorios')
+
   return (
     <div className="app">
       <aside className="sidebar">
@@ -21,7 +27,14 @@ function App() {
           <NavLink to="/vendas">Controle de Vendas</NavLink>
           <NavLink to="/boletos">Boletos</NavLink>
           <NavLink to="/baixa-boleto">Baixa de Boleto</NavLink>
-          <NavLink to="/relatorios">Relatórios</NavLink>
+          <NavLink to={ROTA_DESPESAS}>Despesas</NavLink>
+          <div className={`sidebar-group ${relatoriosAtivo ? 'active' : ''}`}>
+            <span className="sidebar-group-title">Relatórios</span>
+            <div className="sidebar-submenu">
+              <NavLink to="/relatorios/vendas">Relatório de Vendas</NavLink>
+              <NavLink to="/relatorios/boletos-pagos">Relatório de Boletos Pagos</NavLink>
+            </div>
+          </div>
           <NavLink to="/faturamento">Faturamento</NavLink>
           <NavLink to="/configuracoes">Configurações</NavLink>
         </nav>
@@ -33,7 +46,10 @@ function App() {
           <Route path="/vendas" element={<Vendas />} />
           <Route path="/boletos" element={<Boletos />} />
           <Route path="/baixa-boleto" element={<BaixaBoleto />} />
-          <Route path="/relatorios" element={<Relatorios />} />
+          <Route path={ROTA_DESPESAS} element={<Despesas />} />
+          <Route path="/relatorios" element={<Navigate to="/relatorios/vendas" replace />} />
+          <Route path="/relatorios/vendas" element={<RelatorioVendas />} />
+          <Route path="/relatorios/boletos-pagos" element={<RelatorioBoletosPagos />} />
           <Route path="/faturamento" element={<Faturamento />} />
           <Route path="/configuracoes" element={<Configuracoes />} />
         </Routes>

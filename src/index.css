@@ -107,6 +107,33 @@ input:focus, select:focus, textarea:focus {
   color: var(--primary);
 }
 
+.sidebar-group {
+  border-left: 3px solid transparent;
+}
+
+.sidebar-group-title {
+  padding: 12px 20px;
+  color: var(--text);
+  display: block;
+  font-weight: 600;
+}
+
+.sidebar-group.active .sidebar-group-title {
+  color: var(--primary);
+}
+
+.sidebar-submenu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 4px;
+}
+
+.sidebar-submenu a {
+  padding: 10px 20px 10px 34px;
+  font-size: 0.92rem;
+}
+
 .main {
   flex: 1;
   padding: 24px;
