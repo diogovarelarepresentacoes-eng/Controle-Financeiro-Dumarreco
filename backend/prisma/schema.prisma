@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Supplier {
+  id          String     @id @default(uuid())
+  cnpj        String?    @unique
+  legalName   String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  purchases   Purchase[]
+}
+
+model Purchase {
+  id                    String             @id @default(uuid())
+  supplierId            String
+  supplier              Supplier           @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  issueDate             DateTime
+  competenceMonth       String
+  description           String?
+  notes                 String?
+  totalAmount           Decimal            @db.Decimal(14, 2)
+  category              String?
+  costCenter            String?
+  hasInvoice            Boolean            @default(false)
+  source                String
+  nfeAccessKey          String?            @unique
+  nfeNumber             String?
+  nfeSeries             String?
+  nfeNatureOperation    String?
+  recipientName         String?
+  recipientCnpj         String?
+  totalProducts         Decimal?           @db.Decimal(14, 2)
+  totalInvoice          Decimal?           @db.Decimal(14, 2)
+  totalTaxes            Decimal?           @db.Decimal(14, 2)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  deletedAt             DateTime?
+  items                 PurchaseItem[]
+  documents             PurchaseDocument[]
+  payables              Payable[]
+}
+
+model PurchaseItem {
+  id          String   @id @default(uuid())
+  purchaseId  String
+  purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  description String
+  ncm         String?
+  quantity    Decimal  @db.Decimal(14, 4)
+  unitAmount  Decimal  @db.Decimal(14, 4)
+  totalAmount Decimal  @db.Decimal(14, 2)
+}
+
+model PurchaseDocument {
+  id            String   @id @default(uuid())
+  purchaseId    String
+  purchase      Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  documentType  String
+  fileName      String
+  fileContent   String
+  nfeAccessKey  String?
+  createdAt     DateTime @default(now())
+}
+
+model Payable {
+  id            String   @id @default(uuid())
+  purchaseId    String?
+  purchase      Purchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  description   String
+  dueDate       DateTime
+  amount        Decimal  @db.Decimal(14, 2)
+  status        String   @default("pending")
+  paymentDate   DateTime?
+  paymentMethod String?
+  supplierName  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model XmlImportLog {
+  id           String   @id @default(uuid())
+  performedBy  String
+  occurredAt   DateTime @default(now())
+  success      Boolean
+  message      String
+  nfeAccessKey String?
+  purchaseId   String?
+}

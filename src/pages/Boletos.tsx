@@ -1,13 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import type { Boleto } from '../types'
-import type { NFeDados } from '../utils/nfeXmlParser'
-import { storageBoletos, storageContas, registrarBaixaBoleto } from '../services/storage'
+import { storageBoletos } from '../services/storage'
 import { applyCurrencyMask, parseCurrencyFromInput, formatCurrencyForInput } from '../utils/currencyMask'
-import { parseNFeXml } from '../utils/nfeXmlParser'
 import { format } from 'date-fns'
 import ptBR from 'date-fns/locale/pt-BR'
-
-type OrigemPagamentoNFe = 'dinheiro' | 'conta_banco' | 'pendente'
 
 export default function Boletos() {
   const [boletos, setBoletos] = useState<Boleto[]>([])
@@ -16,121 +12,14 @@ export default function Boletos() {
   const [form, setForm] = useState({ descricao: '', valor: '', vencimento: '' })
   const [modalParceladoOpen, setModalParceladoOpen] = useState(false)
   const [formParcelado, setFormParcelado] = useState({ descricao: '', valor: '', parcelas: 2, vencimento: '' })
-  const [importando, setImportando] = useState(false)
-  const [importacaoResultado, setImportacaoResultado] = useState<{ ok: number; erros: number } | null>(null)
-  const inputXmlRef = useRef<HTMLInputElement>(null)
-  const [modalPagamentoNFeOpen, setModalPagamentoNFeOpen] = useState(false)
-  const [nfeParaPagamento, setNfeParaPagamento] = useState<{ dados: NFeDados; origem: OrigemPagamentoNFe; contaBancoId: string }[]>([])
-  const [contas, setContas] = useState(storageContas.getAll().filter((c) => c.ativo))
 
   const load = () => {
     setBoletos(storageBoletos.getAll())
-    setContas(storageContas.getAll().filter((c) => c.ativo))
   }
 
   useEffect(() => {
     load()
   }, [])
-
-  function origemPadraoParaTpag(tPag?: string): OrigemPagamentoNFe {
-    if (!tPag) return 'pendente'
-    if (tPag === '01') return 'dinheiro'
-    if (['03', '04', '17'].includes(tPag)) return 'conta_banco'
-    return 'pendente'
-  }
-
-  const lerArquivoComoTexto = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(String(reader.result ?? ''))
-      reader.onerror = () => reject(reader.error)
-      reader.readAsText(file, 'UTF-8')
-    })
-
-  const importarXml = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files?.length) return
-    setImportando(true)
-    setImportacaoResultado(null)
-    setModalPagamentoNFeOpen(false)
-    let ok = 0
-    let erros = 0
-    const comFormaPagamento: NFeDados[] = []
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
-      if (!file.name.toLowerCase().endsWith('.xml')) {
-        erros++
-        continue
-      }
-      try {
-        const texto = await lerArquivoComoTexto(file)
-        const dados = parseNFeXml(texto)
-        if (dados) {
-          if (dados.formaPagamentoDesc) {
-            comFormaPagamento.push(dados)
-          } else {
-            storageBoletos.save({
-              id: crypto.randomUUID(),
-              descricao: dados.descricao,
-              valor: dados.valor,
-              vencimento: dados.vencimento,
-              pago: false,
-              criadoEm: new Date().toISOString(),
-            })
-            ok++
-          }
-        } else {
-          erros++
-        }
-      } catch {
-        erros++
-      }
-    }
-    if (comFormaPagamento.length > 0) {
-      setNfeParaPagamento(
-        comFormaPagamento.map((dados) => ({
-          dados,
-          origem: origemPadraoParaTpag(dados.tPag) as OrigemPagamentoNFe,
-          contaBancoId: '',
-        }))
-      )
-      setModalPagamentoNFeOpen(true)
-    }
-    setImportacaoResultado({ ok, erros })
-    setImportando(false)
-    load()
-    e.target.value = ''
-  }
-
-  const setItemPagamento = (index: number, upd: Partial<{ origem: OrigemPagamentoNFe; contaBancoId: string }>) => {
-    setNfeParaPagamento((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, ...upd } : item))
-    )
-  }
-
-  const confirmarPagamentosNFe = () => {
-    for (const item of nfeParaPagamento) {
-      const boleto: Boleto = {
-        id: crypto.randomUUID(),
-        descricao: item.dados.descricao,
-        valor: item.dados.valor,
-        vencimento: item.dados.vencimento,
-        pago: false,
-        criadoEm: new Date().toISOString(),
-      }
-      storageBoletos.save(boleto)
-      if (item.origem !== 'pendente') {
-        registrarBaixaBoleto(
-          boleto,
-          item.origem,
-          item.origem === 'conta_banco' ? item.contaBancoId || undefined : undefined
-        )
-      }
-    }
-    setModalPagamentoNFeOpen(false)
-    setNfeParaPagamento([])
-    load()
-  }
 
   const openNew = () => {
     setEditingId(null)
@@ -217,56 +106,15 @@ export default function Boletos() {
   return (
     <>
       <h1 className="page-title">Boletos</h1>
+      <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>
+        A importacao de XML de NFe foi movida para o modulo <strong>Compras</strong>. Nesta tela ficam os lancamentos e parcelamentos de contas a pagar.
+      </p>
       <div style={{ marginBottom: 20, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
         <button type="button" className="btn btn-primary" onClick={openNew}>
           Novo boleto
         </button>
         <button type="button" className="btn btn-secondary" onClick={() => setModalParceladoOpen(true)}>
           Parcelado (cartão crédito)
-        </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <input
-            ref={inputXmlRef}
-            type="file"
-            accept=".xml"
-            multiple
-            onChange={importarXml}
-            disabled={importando}
-            style={{ display: 'none' }}
-          />
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => inputXmlRef.current?.click()}
-            disabled={importando}
-          >
-            {importando ? 'Importando...' : 'Importar de NFe (XML)'}
-          </button>
-          {importacaoResultado && (
-            <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-              {importacaoResultado.ok > 0 && <span style={{ color: 'var(--success)' }}>{importacaoResultado.ok} boleto(s) importado(s)</span>}
-              {importacaoResultado.erros > 0 && (
-                <span style={{ color: 'var(--warning)', marginLeft: importacaoResultado.ok > 0 ? 8 : 0 }}>
-                  {importacaoResultado.erros} arquivo(s) ignorado(s) ou inválido(s)
-                </span>
-              )}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="card" style={{ marginBottom: 20 }}>
-        <h3 style={{ marginBottom: 8 }}>Importação de Notas Fiscais Eletrônicas (NFe)</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 12 }}>
-          Selecione um ou mais arquivos XML de NFe. Serão criados boletos com descrição (número da nota + emitente), valor total (vNF) e vencimento (data de emissão). Você pode editar os boletos após a importação se precisar ajustar o vencimento.
-        </p>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={() => inputXmlRef.current?.click()}
-          disabled={importando}
-        >
-          Selecionar arquivos XML
         </button>
       </div>
 
@@ -349,92 +197,6 @@ export default function Boletos() {
           </table>
         </div>
       </div>
-
-      {modalPagamentoNFeOpen && nfeParaPagamento.length > 0 && (
-        <div className="modal-overlay" onClick={() => { setModalPagamentoNFeOpen(false); setNfeParaPagamento([]) }}>
-          <div className="modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
-            <h2>Forma de pagamento da Nota Fiscal</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 16 }}>
-              A(s) nota(s) fiscal(is) importada(s) contêm forma de pagamento no XML. Informe como deseja lançar o pagamento no controle (ou deixe como pendente).
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {nfeParaPagamento.map((item, index) => (
-                <div
-                  key={index}
-                  className="card"
-                  style={{ padding: 16, background: 'var(--bg-input)', borderColor: 'var(--border)' }}
-                >
-                  <p style={{ margin: '0 0 8px', fontWeight: 600 }}>{item.dados.descricao}</p>
-                  <p style={{ margin: '0 0 12px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                    Valor: {formatMoney(item.dados.valor)} — Forma na NFe: <strong>{item.dados.formaPagamentoDesc ?? '-'}</strong>
-                  </p>
-                  <div className="form-group" style={{ marginBottom: 12 }}>
-                    <label>Como lançar o pagamento?</label>
-                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 8 }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                        <input
-                          type="radio"
-                          name={`origem-${index}`}
-                          checked={item.origem === 'dinheiro'}
-                          onChange={() => setItemPagamento(index, { origem: 'dinheiro', contaBancoId: '' })}
-                        />
-                        Dinheiro
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                        <input
-                          type="radio"
-                          name={`origem-${index}`}
-                          checked={item.origem === 'conta_banco'}
-                          onChange={() => setItemPagamento(index, { origem: 'conta_banco' })}
-                        />
-                        Conta banco (PIX/Crédito/Débito)
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                        <input
-                          type="radio"
-                          name={`origem-${index}`}
-                          checked={item.origem === 'pendente'}
-                          onChange={() => setItemPagamento(index, { origem: 'pendente', contaBancoId: '' })}
-                        />
-                        Deixar como pendente
-                      </label>
-                    </div>
-                  </div>
-                  {item.origem === 'conta_banco' && (
-                    <div className="form-group" style={{ marginTop: 8 }}>
-                      <label>Conta banco</label>
-                      <select
-                        value={item.contaBancoId}
-                        onChange={(e) => setItemPagamento(index, { contaBancoId: e.target.value })}
-                      >
-                        <option value="">Selecione a conta</option>
-                        {contas.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.nome} — {c.banco}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="modal-actions" style={{ marginTop: 20 }}>
-              <button type="button" className="btn btn-secondary" onClick={() => { setModalPagamentoNFeOpen(false); setNfeParaPagamento([]) }}>
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={confirmarPagamentosNFe}
-                disabled={nfeParaPagamento.some((i) => i.origem === 'conta_banco' && !i.contaBancoId)}
-              >
-                Confirmar e criar boleto(s)
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {modalOpen && (
         <div className="modal-overlay" onClick={() => { setModalOpen(false); setEditingId(null); setForm({ descricao: '', valor: '', vencimento: '' }) }}>

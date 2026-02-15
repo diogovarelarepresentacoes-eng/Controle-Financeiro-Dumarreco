@@ -15,6 +15,8 @@ import {
 import { storageVendas, storageBoletos, storageFaturamentoMensal } from '../services/storage'
 import type { FaturamentoMensal as FaturamentoMensalType } from '../types'
 import { applyCurrencyMask, parseCurrencyFromInput, formatCurrencyForInput } from '../utils/currencyMask'
+import { comprasController } from '../modules/compras/controller'
+import { despesasController } from '../modules/despesas/controller'
 
 const MESES_NOMES = [
   'JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO',
@@ -43,17 +45,26 @@ export type LinhaFaturamento = {
   lucroLiq: number
   percFat: number | null
   faturamentoMensalId?: string
+  inventarioFimCalculadoAutomaticamente?: boolean
+}
+
+type ResumoComprasMes = {
+  comNf: number
+  semNf: number
 }
 
 function buildLinhasAno(
   ano: number,
   vendas: { data: string; valor: number; formaPagamento: string }[],
   boletos: { pago: boolean; dataPagamento?: string; valor: number }[],
+  despesasModulo: { dataPagamento?: string; status: string; valor: number }[],
+  comprasResumoPorMes: Map<number, ResumoComprasMes>,
   faturamentoMensal: FaturamentoMensalType[],
   totaisAnoAnterior: number[] // total por mês (1-12) do ano anterior
 ): LinhaFaturamento[] {
   const linhas: LinhaFaturamento[] = []
   let inventarioInicioAnterior = 0
+  let cmvRatioHistorico = 0.65
 
   for (let mes = 1; mes <= 12; mes++) {
     const inicio = startOfMonth(new Date(ano, mes - 1))
@@ -72,15 +83,33 @@ function buildLinhasAno(
         const d = parseISO(b.dataPagamento!)
         return d >= inicio && d <= fim
       })
-    const despesas = boletosPagosNoMes.reduce((s, b) => s + b.valor, 0)
+    const despesasExtrasNoMes = despesasModulo
+      .filter((d) => d.status === 'pago' && d.dataPagamento)
+      .filter((d) => {
+        const dt = parseISO(d.dataPagamento!)
+        return dt >= inicio && dt <= fim
+      })
+      .reduce((s, d) => s + d.valor, 0)
+    const despesas = boletosPagosNoMes.reduce((s, b) => s + b.valor, 0) + despesasExtrasNoMes
 
     const compl = faturamentoMensal.find((f) => f.ano === ano && f.mes === mes)
-    const compras = compl?.comprasDoMes ?? 0
-    const compraSemNota = compl?.compraSemNota ?? 0
+    const comprasAuto = comprasResumoPorMes.get(mes)?.comNf ?? 0
+    const compraSemNotaAuto = comprasResumoPorMes.get(mes)?.semNf ?? 0
+    const compras = comprasAuto
+    const compraSemNota = compraSemNotaAuto
     const acordo = compl?.acordos ?? 0
     const mercadoria = compl?.mercadorias ?? 0
-    const inventarioInicio = compl !== undefined ? compl.valorInventarioInicio : inventarioInicioAnterior
-    const inventarioFim = compl?.valorInventarioFim ?? 0
+    const inventarioInicio =
+      compl?.usarInventarioInicioManual
+        ? compl.valorInventarioInicio
+        : inventarioInicioAnterior
+
+    const cmvEstimado = faturamento * cmvRatioHistorico
+    const inventarioFimAuto = Math.max(0, inventarioInicio + compras + compraSemNota - cmvEstimado)
+    const inventarioFim =
+      compl?.usarInventarioFimManual
+        ? compl.valorInventarioFim
+        : inventarioFimAuto
 
     const total = faturamento + acordo + mercadoria
     const totalAnt = totaisAnoAnterior[mes - 1] ?? 0
@@ -112,7 +141,11 @@ function buildLinhasAno(
       lucroLiq,
       percFat,
       faturamentoMensalId: compl?.id,
+      inventarioFimCalculadoAutomaticamente: !compl?.usarInventarioFimManual,
     })
+    if (faturamento > 0 && custoMercVendidas >= 0) {
+      cmvRatioHistorico = custoMercVendidas / faturamento
+    }
     inventarioInicioAnterior = inventarioFim
   }
   return linhas
@@ -123,13 +156,14 @@ export default function Faturamento() {
   const [anoSelecionado, setAnoSelecionado] = useState(anoAtual)
   const [vendas, setVendas] = useState(() => storageVendas.getAll())
   const [boletos, setBoletos] = useState(() => storageBoletos.getAll())
+  const [despesas, setDespesas] = useState(() => despesasController.listar())
   const [faturamentoMensal, setFaturamentoMensal] = useState(() => storageFaturamentoMensal.getAll())
   const [modalMes, setModalMes] = useState<{ ano: number; mes: number } | null>(null)
   const [form, setForm] = useState({
     valorInventarioInicio: '',
+    usarInventarioInicioManual: false,
     valorInventarioFim: '',
-    comprasDoMes: '',
-    compraSemNota: '',
+    usarInventarioFimManual: false,
     acordos: '',
     mercadorias: '',
   })
@@ -141,17 +175,39 @@ export default function Faturamento() {
   const reload = useCallback(() => {
     setVendas(storageVendas.getAll())
     setBoletos(storageBoletos.getAll())
+    setDespesas(despesasController.listar())
     setFaturamentoMensal(storageFaturamentoMensal.getAll())
   }, [])
 
+  const comprasResumoPorAno = useMemo(() => {
+    const porAno = new Map<number, Map<number, ResumoComprasMes>>()
+    comprasController
+      .listar({ tipoNota: 'todas', statusPagamento: 'todos' })
+      .forEach(({ compra }) => {
+        if (!compra.ativo) return
+        const [ano, mes] = compra.competenciaMes.split('-').map(Number)
+        if (!ano || !mes) return
+        const mapMes = porAno.get(ano) ?? new Map<number, ResumoComprasMes>()
+        const atual = mapMes.get(mes) ?? { comNf: 0, semNf: 0 }
+        if (compra.temNotaFiscal) atual.comNf += compra.valorTotal
+        else atual.semNf += compra.valorTotal
+        mapMes.set(mes, atual)
+        porAno.set(ano, mapMes)
+      })
+    return porAno
+  }, [anoSelecionado, faturamentoMensal, boletos, vendas, despesas])
+
+  const comprasResumoAnoAtual = comprasResumoPorAno.get(anoSelecionado) ?? new Map<number, ResumoComprasMes>()
+  const comprasResumoAnoAnterior = comprasResumoPorAno.get(anoSelecionado - 1) ?? new Map<number, ResumoComprasMes>()
+
   const totaisAnoAnterior = useMemo(() => {
-    const linhasAnt = buildLinhasAno(anoSelecionado - 1, vendas, boletos, faturamentoMensal, [])
+    const linhasAnt = buildLinhasAno(anoSelecionado - 1, vendas, boletos, despesas, comprasResumoAnoAnterior, faturamentoMensal, [])
     return linhasAnt.map((l) => l.total)
-  }, [anoSelecionado, vendas, boletos, faturamentoMensal])
+  }, [anoSelecionado, vendas, boletos, despesas, comprasResumoAnoAnterior, faturamentoMensal])
 
   const linhas = useMemo(
-    () => buildLinhasAno(anoSelecionado, vendas, boletos, faturamentoMensal, totaisAnoAnterior),
-    [anoSelecionado, vendas, boletos, faturamentoMensal, totaisAnoAnterior]
+    () => buildLinhasAno(anoSelecionado, vendas, boletos, despesas, comprasResumoAnoAtual, faturamentoMensal, totaisAnoAnterior),
+    [anoSelecionado, vendas, boletos, despesas, comprasResumoAnoAtual, faturamentoMensal, totaisAnoAnterior]
   )
 
   const totais = useMemo(() => ({
@@ -180,13 +236,17 @@ export default function Faturamento() {
 
   const abrirModal = (ano: number, mes: number) => {
     const compl = faturamentoMensal.find((f) => f.ano === ano && f.mes === mes)
-    const invInicioSugerido = mes === 1 ? 0 : faturamentoMensal.find((f) => f.ano === ano && f.mes === mes - 1)?.valorInventarioFim ?? 0
+    const linhaAnterior = linhas.find((l) => l.ano === ano && l.mes === mes - 1)
+    const invInicioSugerido = mes === 1 ? 0 : linhaAnterior?.inventarioFim ?? 0
+    const linhaAtual = linhas.find((l) => l.ano === ano && l.mes === mes)
     const v = (n: number) => (n === 0 ? '0,00' : formatCurrencyForInput(n) || '0,00')
     setForm({
-      valorInventarioInicio: compl ? v(compl.valorInventarioInicio) : v(invInicioSugerido),
-      valorInventarioFim: compl ? v(compl.valorInventarioFim) : '0,00',
-      comprasDoMes: compl ? v(compl.comprasDoMes) : '0,00',
-      compraSemNota: compl ? v(compl.compraSemNota) : '0,00',
+      valorInventarioInicio: compl?.usarInventarioInicioManual ? v(compl.valorInventarioInicio) : v(invInicioSugerido),
+      usarInventarioInicioManual: Boolean(compl?.usarInventarioInicioManual),
+      valorInventarioFim: compl?.usarInventarioFimManual
+        ? v(compl.valorInventarioFim)
+        : v(linhaAtual?.inventarioFim ?? 0),
+      usarInventarioFimManual: Boolean(compl?.usarInventarioFimManual),
       acordos: compl ? v(compl.acordos) : '0,00',
       mercadorias: compl ? v(compl.mercadorias) : '0,00',
     })
@@ -197,14 +257,23 @@ export default function Faturamento() {
     e.preventDefault()
     if (!modalMes) return
     const existente = faturamentoMensal.find((f) => f.ano === modalMes.ano && f.mes === modalMes.mes)
+    const ym = `${modalMes.ano}-${String(modalMes.mes).padStart(2, '0')}`
+    const comprasDoMes = comprasController
+      .listar({ mesCompetencia: ym, tipoNota: 'com_nf', statusPagamento: 'todos' })
+      .reduce((s, c) => s + c.compra.valorTotal, 0)
+    const compraSemNota = comprasController
+      .listar({ mesCompetencia: ym, tipoNota: 'sem_nf', statusPagamento: 'todos' })
+      .reduce((s, c) => s + c.compra.valorTotal, 0)
     const item: FaturamentoMensalType = {
       id: existente?.id ?? crypto.randomUUID(),
       ano: modalMes.ano,
       mes: modalMes.mes,
       valorInventarioInicio: parseCurrencyFromInput(form.valorInventarioInicio),
+      usarInventarioInicioManual: form.usarInventarioInicioManual,
       valorInventarioFim: parseCurrencyFromInput(form.valorInventarioFim),
-      comprasDoMes: parseCurrencyFromInput(form.comprasDoMes),
-      compraSemNota: parseCurrencyFromInput(form.compraSemNota),
+      usarInventarioFimManual: form.usarInventarioFimManual,
+      comprasDoMes,
+      compraSemNota,
       acordos: parseCurrencyFromInput(form.acordos),
       mercadorias: parseCurrencyFromInput(form.mercadorias),
       criadoEm: existente?.criadoEm ?? new Date().toISOString(),
@@ -220,9 +289,17 @@ export default function Faturamento() {
     const anos = [anoSelecionado - 1, anoSelecionado]
     return anos.map((a) => ({
       ano: String(a),
-      total: buildLinhasAno(a, vendas, boletos, faturamentoMensal, []).reduce((s, l) => s + l.total, 0),
+      total: buildLinhasAno(
+        a,
+        vendas,
+        boletos,
+        despesas,
+        comprasResumoPorAno.get(a) ?? new Map<number, ResumoComprasMes>(),
+        faturamentoMensal,
+        [],
+      ).reduce((s, l) => s + l.total, 0),
     }))
-  }, [anoSelecionado, vendas, boletos, faturamentoMensal])
+  }, [anoSelecionado, vendas, boletos, despesas, comprasResumoPorAno, faturamentoMensal])
 
   const anosDisponiveis = useMemo(() => {
     const anos = new Set<number>()
@@ -237,7 +314,7 @@ export default function Faturamento() {
     <div className="faturamento-page relatorios-page">
       <h1 className="page-title no-print">Acompanhamento do Faturamento</h1>
       <p className="no-print" style={{ color: 'var(--text-muted)', marginBottom: 16 }}>
-        Estrutura igual à planilha: faturamento e venda cartão vêm das <strong>Vendas</strong>, despesas dos <strong>Boletos pagos</strong>. Informe apenas o <strong>inventário</strong> (início e fim do mês) e, se quiser, compras, acordo e mercadoria.
+        Estrutura igual à planilha: faturamento e venda cartão vêm das <strong>Vendas</strong>, compras do mês vêm do módulo <strong>Compras</strong>, despesas vêm de <strong>Boletos pagos + Despesas pagas</strong>. Inventário e resultado são calculados automaticamente, com opção de ajuste manual no mês.
       </p>
 
       <div className="no-print" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, marginBottom: 24 }}>
@@ -326,7 +403,7 @@ export default function Faturamento() {
       <div className="card" style={{ marginBottom: 24 }}>
         <h3 style={{ marginBottom: 8 }}>Inventário e resultado</h3>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 12 }}>
-          Inventário início/fim do mês: informe em &quot;Dados do mês&quot;. Despesas = boletos pagos no mês. Custo = Inventário início + Compras + Compra s/nota − Inventário fim.
+          Inventário início/fim automático por sequência mensal. Se necessário, abra &quot;Dados do mês&quot; para fixar valor manual. Custo = Inventário início + Compras + Compra s/nota − Inventário fim.
         </p>
         <div className="table-wrap">
           <table className="relatorio-tabela">
@@ -352,7 +429,14 @@ export default function Faturamento() {
                   <td>{formatMoney(l.inventarioInicio)}</td>
                   <td>{formatMoney(l.compras)}</td>
                   <td>{formatMoney(l.compraSemNota)}</td>
-                  <td>{formatMoney(l.inventarioFim)}</td>
+                  <td>
+                    {formatMoney(l.inventarioFim)}
+                    {l.inventarioFimCalculadoAutomaticamente && (
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        auto
+                      </span>
+                    )}
+                  </td>
                   <td>{formatMoney(l.custoMercVendidas)}</td>
                   <td>{formatMoney(l.faturamento)}</td>
                   <td className={l.lucroBruto >= 0 ? 'saldo-positivo' : 'saldo-negativo'}>{formatMoney(l.lucroBruto)}</td>
@@ -415,24 +499,48 @@ export default function Faturamento() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2>Dados do mês — {MESES_NOMES[modalMes.mes - 1]} {modalMes.ano}</h2>
             <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: 16 }}>
-              Faturamento e venda cartão vêm das vendas; despesas dos boletos pagos. Informe inventário (início e fim do mês) e, se desejar, compras, acordo e mercadoria.
+              Compras no mês e compra sem nota são automáticas com base no módulo Compras. Ajuste manual apenas o inventário quando necessário.
             </p>
             <form onSubmit={salvarDadosMes}>
               <div className="form-group">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={form.usarInventarioInicioManual}
+                    onChange={(e) => setForm((f) => ({ ...f, usarInventarioInicioManual: e.target.checked }))}
+                  />
+                  Fixar inventário início manualmente
+                </label>
+              </div>
+              <div className="form-group">
                 <label>Inventário início do mês (R$)</label>
-                <input value={form.valorInventarioInicio} onChange={(e) => setForm((f) => ({ ...f, valorInventarioInicio: applyCurrencyMask(e.target.value) }))} placeholder="0,00" inputMode="decimal" />
+                <input
+                  value={form.valorInventarioInicio}
+                  onChange={(e) => setForm((f) => ({ ...f, valorInventarioInicio: applyCurrencyMask(e.target.value) }))}
+                  placeholder="0,00"
+                  inputMode="decimal"
+                  disabled={!form.usarInventarioInicioManual}
+                />
+              </div>
+              <div className="form-group">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={form.usarInventarioFimManual}
+                    onChange={(e) => setForm((f) => ({ ...f, usarInventarioFimManual: e.target.checked }))}
+                  />
+                  Fixar inventário fim manualmente
+                </label>
               </div>
               <div className="form-group">
                 <label>Inventário fim do mês (R$)</label>
-                <input value={form.valorInventarioFim} onChange={(e) => setForm((f) => ({ ...f, valorInventarioFim: applyCurrencyMask(e.target.value) }))} placeholder="0,00" inputMode="decimal" />
-              </div>
-              <div className="form-group">
-                <label>Compras no mês (R$)</label>
-                <input value={form.comprasDoMes} onChange={(e) => setForm((f) => ({ ...f, comprasDoMes: applyCurrencyMask(e.target.value) }))} placeholder="0,00" inputMode="decimal" />
-              </div>
-              <div className="form-group">
-                <label>Compra s/ nota (R$)</label>
-                <input value={form.compraSemNota} onChange={(e) => setForm((f) => ({ ...f, compraSemNota: applyCurrencyMask(e.target.value) }))} placeholder="0,00" inputMode="decimal" />
+                <input
+                  value={form.valorInventarioFim}
+                  onChange={(e) => setForm((f) => ({ ...f, valorInventarioFim: applyCurrencyMask(e.target.value) }))}
+                  placeholder="0,00"
+                  inputMode="decimal"
+                  disabled={!form.usarInventarioFimManual}
+                />
               </div>
               <div className="form-group">
                 <label>Acordo (R$)</label>

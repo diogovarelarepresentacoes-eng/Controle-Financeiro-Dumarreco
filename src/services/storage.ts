@@ -6,6 +6,11 @@ const KEY_MOVIMENTACOES = 'controle-financeiro-movimentacoes';
 const KEY_VENDAS = 'controle-financeiro-vendas';
 const KEY_FATURAMENTO_MENSAL = 'controle-financeiro-faturamento-mensal';
 const KEY_DESPESAS = 'controle-financeiro-despesas';
+const KEY_COMPRAS = 'controle-financeiro-compras';
+const KEY_COMPRAS_ITENS = 'controle-financeiro-compras-itens';
+const KEY_COMPRAS_DOCUMENTOS = 'controle-financeiro-compras-documentos';
+const KEY_FORNECEDORES = 'controle-financeiro-fornecedores';
+const KEY_IMPORT_LOGS = 'controle-financeiro-importacao-xml-logs';
 
 /** Remove todos os dados do sistema. */
 export function zerarBancoDeDados(): void {
@@ -15,6 +20,11 @@ export function zerarBancoDeDados(): void {
   localStorage.removeItem(KEY_VENDAS);
   localStorage.removeItem(KEY_FATURAMENTO_MENSAL);
   localStorage.removeItem(KEY_DESPESAS);
+  localStorage.removeItem(KEY_COMPRAS);
+  localStorage.removeItem(KEY_COMPRAS_ITENS);
+  localStorage.removeItem(KEY_COMPRAS_DOCUMENTOS);
+  localStorage.removeItem(KEY_FORNECEDORES);
+  localStorage.removeItem(KEY_IMPORT_LOGS);
 }
 
 function getContas(): ContaBanco[] {
@@ -130,6 +140,9 @@ export const storageBoletos = {
     else boletos.push(boleto);
     setBoletos(boletos);
     return boleto;
+  },
+  saveAll: (boletos: Boleto[]) => {
+    setBoletos(boletos);
   },
   delete: (id: string) => {
     setBoletos(getBoletos().filter((b) => b.id !== id));

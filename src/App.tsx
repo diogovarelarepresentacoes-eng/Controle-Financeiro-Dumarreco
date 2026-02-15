@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
 import ContaBanco from './pages/ContaBanco'
@@ -10,9 +11,14 @@ import Faturamento from './pages/Faturamento'
 import Configuracoes from './pages/Configuracoes'
 import Despesas from './pages/Despesas'
 import { ROTA_DESPESAS } from './modules/despesas/routes'
+import Compras from './pages/Compras'
+import { ROTA_COMPRAS } from './modules/compras/routes'
 
 function App() {
   const location = useLocation()
+  const [menuFinanceiroAberto, setMenuFinanceiroAberto] = useState(false)
+  const [menuRelatoriosAberto, setMenuRelatoriosAberto] = useState(false)
+  const financeiroAtivo = location.pathname === '/boletos' || location.pathname === '/baixa-boleto'
   const relatoriosAtivo = location.pathname.startsWith('/relatorios')
 
   return (
@@ -25,15 +31,37 @@ function App() {
           <NavLink to="/" end>Dashboard</NavLink>
           <NavLink to="/contas-banco">Conta Banco</NavLink>
           <NavLink to="/vendas">Controle de Vendas</NavLink>
-          <NavLink to="/boletos">Boletos</NavLink>
-          <NavLink to="/baixa-boleto">Baixa de Boleto</NavLink>
+          <div className={`sidebar-group ${financeiroAtivo ? 'active' : ''}`}>
+            <button
+              type="button"
+              className="sidebar-group-title sidebar-group-trigger"
+              onClick={() => setMenuFinanceiroAberto((prev) => !prev)}
+            >
+              Financeiro <span>{menuFinanceiroAberto ? '▾' : '▸'}</span>
+            </button>
+            {menuFinanceiroAberto && (
+              <div className="sidebar-submenu">
+                <NavLink to="/boletos">Boletos</NavLink>
+                <NavLink to="/baixa-boleto">Baixa de Boleto</NavLink>
+              </div>
+            )}
+          </div>
+          <NavLink to={ROTA_COMPRAS}>Compras</NavLink>
           <NavLink to={ROTA_DESPESAS}>Despesas</NavLink>
           <div className={`sidebar-group ${relatoriosAtivo ? 'active' : ''}`}>
-            <span className="sidebar-group-title">Relatórios</span>
-            <div className="sidebar-submenu">
-              <NavLink to="/relatorios/vendas">Relatório de Vendas</NavLink>
-              <NavLink to="/relatorios/boletos-pagos">Relatório de Boletos Pagos</NavLink>
-            </div>
+            <button
+              type="button"
+              className="sidebar-group-title sidebar-group-trigger"
+              onClick={() => setMenuRelatoriosAberto((prev) => !prev)}
+            >
+              Relatórios <span>{menuRelatoriosAberto ? '▾' : '▸'}</span>
+            </button>
+            {menuRelatoriosAberto && (
+              <div className="sidebar-submenu">
+                <NavLink to="/relatorios/vendas">Relatório de Vendas</NavLink>
+                <NavLink to="/relatorios/boletos-pagos">Relatório de Boletos Pagos</NavLink>
+              </div>
+            )}
           </div>
           <NavLink to="/faturamento">Faturamento</NavLink>
           <NavLink to="/configuracoes">Configurações</NavLink>
@@ -45,6 +73,7 @@ function App() {
           <Route path="/contas-banco" element={<ContaBanco />} />
           <Route path="/vendas" element={<Vendas />} />
           <Route path="/boletos" element={<Boletos />} />
+          <Route path={ROTA_COMPRAS} element={<Compras />} />
           <Route path="/baixa-boleto" element={<BaixaBoleto />} />
           <Route path={ROTA_DESPESAS} element={<Despesas />} />
           <Route path="/relatorios" element={<Navigate to="/relatorios/vendas" replace />} />

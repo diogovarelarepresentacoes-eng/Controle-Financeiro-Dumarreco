@@ -24,6 +24,8 @@ export interface Boleto {
   dataPagamento?: string;
   origemPagamento?: OrigemPagamento;
   contaBancoId?: string;
+  /** Vinculo opcional com compra no modulo de compras */
+  compraId?: string;
   criadoEm: string;
 }
 
@@ -59,8 +61,12 @@ export interface FaturamentoMensal {
   mes: number; // 1-12
   /** Inventário no início do mês (usuário) */
   valorInventarioInicio: number;
+  /** Se true, usa valorInventarioInicio manual; se false/undefined, calcula automático */
+  usarInventarioInicioManual?: boolean;
   /** Inventário no final do mês (usuário) */
   valorInventarioFim: number;
+  /** Se true, usa valorInventarioFim manual; se false/undefined, calcula automático */
+  usarInventarioFimManual?: boolean;
   /** Compras no mês (usuário, opcional) */
   comprasDoMes: number;
   /** Compra s/ nota (usuário, opcional) */

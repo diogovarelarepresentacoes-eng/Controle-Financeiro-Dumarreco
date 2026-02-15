@@ -118,6 +118,20 @@ input:focus, select:focus, textarea:focus {
   font-weight: 600;
 }
 
+.sidebar-group-trigger {
+  width: 100%;
+  background: transparent;
+  text-align: left;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-group-trigger:hover {
+  background: rgba(29, 155, 240, 0.1);
+}
+
 .sidebar-group.active .sidebar-group-title {
   color: var(--primary);
 }
