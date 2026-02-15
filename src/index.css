@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -5,25 +7,42 @@
 }
 
 :root {
-  --bg: #0f1419;
-  --bg-card: #1a2332;
-  --bg-input: #243447;
-  --border: #384a5c;
+  --bg: #0b1220;
+  --bg-card: #111b2e;
+  --bg-input: #1a2740;
+  --border: #2a3b5c;
   --text: #e7e9ea;
-  --text-muted: #8b98a5;
-  --primary: #1d9bf0;
-  --primary-hover: #1a8cd8;
-  --success: #00ba7c;
-  --danger: #f4212e;
-  --warning: #ffad1f;
+  --text-muted: #9aa8ba;
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --shadow-lg: 0 16px 30px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme='light'] {
+  --bg: #f3f6fb;
+  --bg-card: #ffffff;
+  --bg-input: #f4f7fc;
+  --border: #d7dfec;
+  --text: #12223a;
+  --text-muted: #607089;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --success: #16a34a;
+  --danger: #dc2626;
+  --warning: #d97706;
+  --shadow-lg: 0 16px 30px rgba(15, 23, 42, 0.12);
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
   line-height: 1.5;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 a {
@@ -60,19 +79,35 @@ input:focus, select:focus, textarea:focus {
 .app {
   display: flex;
   min-height: 100vh;
+  background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 45%);
 }
 
 .sidebar {
-  width: 260px;
+  width: 280px;
   background: var(--bg-card);
   border-right: 1px solid var(--border);
-  padding: 20px 0;
+  padding: 20px 0 14px;
+  box-shadow: var(--shadow-lg);
+  z-index: 20;
+}
+
+.desktop-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+}
+
+.mobile-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
 }
 
 .sidebar-header {
   padding: 0 20px 16px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .sidebar-header strong {
@@ -84,10 +119,11 @@ input:focus, select:focus, textarea:focus {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding: 0 8px;
 }
 
 .sidebar a {
-  padding: 12px 20px;
+  padding: 11px 14px;
   color: var(--text);
   text-decoration: none;
   display: flex;
@@ -112,7 +148,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .sidebar-group-title {
-  padding: 12px 20px;
+  padding: 11px 14px;
   color: var(--text);
   display: block;
   font-weight: 600;
@@ -144,14 +180,19 @@ input:focus, select:focus, textarea:focus {
 }
 
 .sidebar-submenu a {
-  padding: 10px 20px 10px 34px;
+  padding: 10px 14px 10px 28px;
   font-size: 0.92rem;
 }
 
 .main {
   flex: 1;
-  padding: 24px;
+  margin-left: 280px;
+  padding: 24px 28px;
   overflow: auto;
+}
+
+.mobile-topbar {
+  display: none;
 }
 
 .page-title {
@@ -167,6 +208,7 @@ input:focus, select:focus, textarea:focus {
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 20px;
+  box-shadow: var(--shadow-lg);
 }
 
 .btn {
@@ -301,10 +343,11 @@ tr:hover td {
 }
 
 .card-saldo {
-  background: linear-gradient(135deg, var(--bg-card) 0%, #243447 100%);
+  background: linear-gradient(135deg, var(--bg-card) 0%, rgba(37, 99, 235, 0.14) 100%);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 20px;
+  box-shadow: var(--shadow-lg);
 }
 
 .card-saldo h3 {
@@ -316,6 +359,21 @@ tr:hover td {
 .card-saldo .valor {
   font-size: 1.75rem;
   font-weight: 700;
+}
+
+.stat-card .valor.tone-positive { color: var(--success); }
+.stat-card .valor.tone-negative { color: var(--danger); }
+.stat-card .valor.tone-warning { color: var(--warning); }
+.stat-card .valor.tone-default { color: var(--text); }
+
+.stat-subtitle {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.theme-toggle {
+  width: 100%;
 }
 
 .checkbox-group {
@@ -526,4 +584,41 @@ tr:hover td {
 
   .faturamento-page .saldo-positivo { color: #0a7d4d; }
   .faturamento-page .saldo-negativo { color: #c41e2a; }
+}
+
+@media (max-width: 980px) {
+  .desktop-sidebar {
+    display: none;
+  }
+
+  .mobile-topbar {
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: 64px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    z-index: 30;
+  }
+
+  .main {
+    margin-left: 0;
+    padding: 84px 14px 20px;
+  }
+
+  .grid-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .page-title {
+    font-size: 1.25rem;
+    margin-bottom: 16px;
+  }
 }

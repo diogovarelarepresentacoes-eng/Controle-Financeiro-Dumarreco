@@ -24,6 +24,7 @@ import {
 } from 'recharts'
 import { storageContas, storageBoletos, storageVendas, getSaldoDinheiro } from '../services/storage'
 import type { Boleto } from '../types'
+import { StatCard } from '../components/ui/StatCard'
 
 type VendasPorData = {
   data: string
@@ -141,48 +142,35 @@ export default function Dashboard() {
       <h1 className="page-title">Dashboard</h1>
 
       <div className="grid-cards" style={{ marginBottom: 32 }}>
-        <div className="card-saldo">
-          <h3>Saldo bancário total</h3>
-          <div className={`valor ${totalSaldoBancario >= 0 ? 'saldo-positivo' : 'saldo-negativo'}`}>
-            {formatMoney(totalSaldoBancario)}
-          </div>
-          <p style={{ marginTop: 8, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Soma do saldo real de todas as contas banco habilitadas
-          </p>
-        </div>
-        <div className="card-saldo">
-          <h3>Caixa Interno</h3>
-          <div className={`valor ${saldoDinheiro >= 0 ? 'saldo-positivo' : 'saldo-negativo'}`}>
-            {formatMoney(saldoDinheiro)}
-          </div>
-          <p style={{ marginTop: 8, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Vendas em dinheiro menos boletos pagos em dinheiro
-          </p>
-        </div>
-        <div className="card-saldo">
-          <h3>Total de vendas</h3>
-          <div className="valor saldo-positivo">{formatMoney(totalVendas)}</div>
-          <p style={{ marginTop: 8, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            PIX, dinheiro, débito e crédito
-          </p>
+        <StatCard
+          title="Saldo bancario total"
+          value={formatMoney(totalSaldoBancario)}
+          tone={totalSaldoBancario >= 0 ? 'positive' : 'negative'}
+          subtitle="Soma do saldo real de todas as contas banco habilitadas"
+        />
+        <StatCard
+          title="Caixa Interno"
+          value={formatMoney(saldoDinheiro)}
+          tone={saldoDinheiro >= 0 ? 'positive' : 'negative'}
+          subtitle="Vendas em dinheiro menos boletos pagos em dinheiro"
+        />
+        <StatCard title="Total de vendas" value={formatMoney(totalVendas)} tone="positive" subtitle="PIX, dinheiro, debito e credito">
           <Link to="/vendas" style={{ display: 'inline-block', marginTop: 8, fontSize: '0.9rem' }}>
             Controle de Vendas →
           </Link>
-        </div>
-        <div className="card-saldo">
-          <h3>Boletos pendentes</h3>
-          <div className="valor" style={{ color: 'var(--warning)' }}>
-            {formatMoney(totalPendente)}
-          </div>
-          <p style={{ marginTop: 8, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            {boletosPendentes.length} boleto(s) aguardando pagamento
-          </p>
+        </StatCard>
+        <StatCard
+          title="Boletos pendentes"
+          value={formatMoney(totalPendente)}
+          tone="warning"
+          subtitle={`${boletosPendentes.length} boleto(s) aguardando pagamento`}
+        >
           {boletosPendentes.length > 0 && (
             <Link to="/baixa-boleto" style={{ display: 'inline-block', marginTop: 8, fontSize: '0.9rem' }}>
               Dar baixa →
             </Link>
           )}
-        </div>
+        </StatCard>
       </div>
 
       {/* Entradas de vendas por data */}

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import Dashboard from './pages/Dashboard'
 import ContaBanco from './pages/ContaBanco'
 import Boletos from './pages/Boletos'
@@ -13,77 +13,37 @@ import Despesas from './pages/Despesas'
 import { ROTA_DESPESAS } from './modules/despesas/routes'
 import Compras from './pages/Compras'
 import { ROTA_COMPRAS } from './modules/compras/routes'
+import { AppLayout } from './components/layout/AppLayout'
 
 function App() {
   const location = useLocation()
-  const [menuFinanceiroAberto, setMenuFinanceiroAberto] = useState(false)
-  const [menuRelatoriosAberto, setMenuRelatoriosAberto] = useState(false)
-  const financeiroAtivo = location.pathname === '/boletos' || location.pathname === '/baixa-boleto'
-  const relatoriosAtivo = location.pathname.startsWith('/relatorios')
-
   return (
-    <div className="app">
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <strong>Controle Financeiro Dumarreco</strong>
-        </div>
-        <nav className="sidebar-nav">
-          <NavLink to="/" end>Dashboard</NavLink>
-          <NavLink to="/contas-banco">Conta Banco</NavLink>
-          <NavLink to="/vendas">Controle de Vendas</NavLink>
-          <div className={`sidebar-group ${financeiroAtivo ? 'active' : ''}`}>
-            <button
-              type="button"
-              className="sidebar-group-title sidebar-group-trigger"
-              onClick={() => setMenuFinanceiroAberto((prev) => !prev)}
-            >
-              Financeiro <span>{menuFinanceiroAberto ? '▾' : '▸'}</span>
-            </button>
-            {menuFinanceiroAberto && (
-              <div className="sidebar-submenu">
-                <NavLink to="/boletos">Boletos</NavLink>
-                <NavLink to="/baixa-boleto">Baixa de Boleto</NavLink>
-              </div>
-            )}
-          </div>
-          <NavLink to={ROTA_COMPRAS}>Compras</NavLink>
-          <NavLink to={ROTA_DESPESAS}>Despesas</NavLink>
-          <div className={`sidebar-group ${relatoriosAtivo ? 'active' : ''}`}>
-            <button
-              type="button"
-              className="sidebar-group-title sidebar-group-trigger"
-              onClick={() => setMenuRelatoriosAberto((prev) => !prev)}
-            >
-              Relatórios <span>{menuRelatoriosAberto ? '▾' : '▸'}</span>
-            </button>
-            {menuRelatoriosAberto && (
-              <div className="sidebar-submenu">
-                <NavLink to="/relatorios/vendas">Relatório de Vendas</NavLink>
-                <NavLink to="/relatorios/boletos-pagos">Relatório de Boletos Pagos</NavLink>
-              </div>
-            )}
-          </div>
-          <NavLink to="/faturamento">Faturamento</NavLink>
-          <NavLink to="/configuracoes">Configurações</NavLink>
-        </nav>
-      </aside>
-      <main className="main">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/contas-banco" element={<ContaBanco />} />
-          <Route path="/vendas" element={<Vendas />} />
-          <Route path="/boletos" element={<Boletos />} />
-          <Route path={ROTA_COMPRAS} element={<Compras />} />
-          <Route path="/baixa-boleto" element={<BaixaBoleto />} />
-          <Route path={ROTA_DESPESAS} element={<Despesas />} />
-          <Route path="/relatorios" element={<Navigate to="/relatorios/vendas" replace />} />
-          <Route path="/relatorios/vendas" element={<RelatorioVendas />} />
-          <Route path="/relatorios/boletos-pagos" element={<RelatorioBoletosPagos />} />
-          <Route path="/faturamento" element={<Faturamento />} />
-          <Route path="/configuracoes" element={<Configuracoes />} />
-        </Routes>
-      </main>
-    </div>
+    <AppLayout>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={location.pathname}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.2 }}
+        >
+          <Routes location={location}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/contas-banco" element={<ContaBanco />} />
+            <Route path="/vendas" element={<Vendas />} />
+            <Route path="/boletos" element={<Boletos />} />
+            <Route path={ROTA_COMPRAS} element={<Compras />} />
+            <Route path="/baixa-boleto" element={<BaixaBoleto />} />
+            <Route path={ROTA_DESPESAS} element={<Despesas />} />
+            <Route path="/relatorios" element={<Navigate to="/relatorios/vendas" replace />} />
+            <Route path="/relatorios/vendas" element={<RelatorioVendas />} />
+            <Route path="/relatorios/boletos-pagos" element={<RelatorioBoletosPagos />} />
+            <Route path="/faturamento" element={<Faturamento />} />
+            <Route path="/configuracoes" element={<Configuracoes />} />
+          </Routes>
+        </motion.div>
+      </AnimatePresence>
+    </AppLayout>
   )
 }
 
