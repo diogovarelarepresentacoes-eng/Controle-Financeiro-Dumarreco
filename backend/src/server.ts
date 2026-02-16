@@ -1,7 +1,8 @@
 import { createApp } from './app'
+import { env } from './config/env'
 
 const app = createApp()
-const port = Number(process.env.PORT || 3333)
+const port = env.PORT
 
 app.listen(port, () => {
   // eslint-disable-next-line no-console

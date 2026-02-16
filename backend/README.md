@@ -20,8 +20,25 @@ API REST para o modulo de compras mensal com PostgreSQL + Prisma.
 4. Aplique migracoes:
    - `npm run prisma:migrate` (dev)
    - ou `npm run prisma:deploy` (staging/prod)
+   - nunca use `prisma migrate reset` em ambiente com dados reais
 5. Inicie a API:
    - `npm run dev`
+
+## Docker seguro (recomendado)
+
+Na raiz do projeto:
+
+1. Copie `.env.docker.example` para `.env.docker` e ajuste credenciais.
+2. Execute:
+   - `docker compose --env-file .env.docker up -d --build`
+
+Detalhes de seguranca:
+
+- PostgreSQL usa volume nomeado `dumarreco_postgres_data` (persistente fora da pasta do projeto).
+- API e banco estao separados em servicos distintos (`api` e `db`).
+- API executa somente `prisma migrate deploy` no startup.
+- Atualizacao segura pode usar:
+  - `scripts\windows\update_safe.bat`
 
 ## Integracao Frontend (Fase 2.1)
 
@@ -49,6 +66,7 @@ Sem ela, a tela continua em modo legado (`localStorage`).
 - Geracao automatica de contas a pagar por duplicatas no XML.
 - Geracao manual de parcelamento quando necessario.
 - Soft-delete de compras e bloqueio de exclusao com contas pagas.
+- Validacao estrita de variaveis de ambiente no startup da API.
 
 ## Migracao de dados legados
 

@@ -1,166 +1,218 @@
-# Manual de Instalação – Controle Financeiro Dumarreco (Rede Local)
+# Manual de Instalação - Controle Financeiro Dumarreco (Computador Local)
 
-Este manual descreve como instalar e executar o sistema em um servidor na rede local para que outros computadores possam acessá-lo pelo navegador.
+Este manual descreve como instalar e executar o sistema em **um computador local**.
+
+Ele cobre dois modos:
+
+- **Modo A (rápido):** somente frontend (dados no navegador/localStorage).
+- **Modo B (recomendado):** frontend + backend + PostgreSQL (Fase 2/2.1).
 
 ---
 
-## 1. Requisitos do servidor
+## 1. Requisitos
 
-- **Node.js** versão 18 ou superior (recomendado LTS).  
+### 1.1 Obrigatórios
+
+- **Node.js 18+** (recomendado LTS)  
   Download: https://nodejs.org/
+- **Git** (opcional, mas recomendado)  
+  Download: https://git-scm.com/
+- **Windows 10/11** (ou Linux/macOS equivalente)
 
-- **Windows 10/11** ou outro sistema onde o Node.js esteja instalado.
+### 1.2 Para modo recomendado (com backend)
 
----
-
-## 2. Instalação no servidor
-
-### 2.1 Copiar o projeto para o servidor
-
-Copie a pasta completa do projeto **Controle Financeiro Dumarreco** para o computador que será o servidor (ex.: `C:\ControleFinanceiroDumarreco`).
-
-### 2.2 Instalar dependências
-
-1. Abra o **Prompt de Comando** ou **PowerShell**.
-2. Acesse a pasta do projeto:
-   ```cmd
-   cd C:\ControleFinanceiroDumarreco
-   ```
-   (Ajuste o caminho se tiver colocado em outro local.)
-
-3. Instale as dependências:
-   ```cmd
-   npm install
-   ```
-
-### 2.3 Gerar a versão para produção (build)
-
-Ainda na pasta do projeto, execute:
-
-```cmd
-npm run build
-```
-
-Isso gera a pasta `dist` com os arquivos que o navegador vai usar. Não é necessário repetir o build a cada uso; só faça de novo quando atualizar o sistema.
+- **PostgreSQL 14+** instalado localmente  
+  Download: https://www.postgresql.org/download/
 
 ---
 
-## 3. Executar o servidor na rede local
+## 2. Baixar o projeto
 
-Na pasta do projeto, execute:
-
-```cmd
-npm run servidor
-```
-
-Ou, de forma equivalente:
-
-```cmd
-npm run preview -- --host
-```
-
-Você verá uma mensagem parecida com:
-
-```
-  ➜  Local:   http://localhost:4173/
-  ➜  Network: http://192.168.1.100:4173/
-```
-
-- **Local:** acesso no próprio servidor.
-- **Network:** endereço para outros PCs da rede (o IP pode ser diferente no seu caso).
-
-### 3.1 Descobrir o IP do servidor (Windows)
-
-No PowerShell ou CMD do servidor, execute:
-
-```cmd
-ipconfig
-```
-
-Procure o endereço **IPv4** do adaptador em uso (ex.: Wi-Fi ou Ethernet), algo como `192.168.1.100`.
-
-### 3.2 Acessar de outros computadores
-
-Nos outros PCs da rede (no mesmo Wi-Fi/LAN):
-
-1. Abra o navegador (Chrome, Edge, Firefox, etc.).
-2. Digite na barra de endereços:
-   ```
-   http://IP-DO-SERVIDOR:4173
-   ```
-   Exemplo: `http://192.168.1.100:4173`
-
-3. A tela inicial do Controle Financeiro Dumarreco será exibida.
-
-**Importante:** Os dados (contas, boletos, vendas) ficam armazenados no **localStorage do navegador** de cada computador. Ou seja, cada PC terá seus próprios dados, a menos que todos acessem sempre pelo mesmo navegador no mesmo computador.
+1. Copie a pasta do projeto para o computador local  
+   Exemplo: `C:\ControleFinanceiroDumarreco`
+2. Abra o **PowerShell** nessa pasta.
 
 ---
 
-## 4. Zerar o banco de dados (remover dados de teste)
+## 3. Instalar dependências
 
-O sistema não vem com dados de teste. Se em algum momento você tiver usado dados apenas para teste e quiser começar do zero:
-
-1. Acesse o sistema pelo navegador.
-2. No menu lateral, clique em **Configurações**.
-3. Na seção **Zerar banco de dados**, clique em **Zerar todos os dados**.
-4. Confirme em **Sim, zerar tudo**.
-
-Isso apaga **todos** os dados (contas, boletos, movimentações e vendas) **desse navegador**. A ação não pode ser desfeita.
-
-Para “zerar” em outro computador, repita o processo no navegador daquele PC.
-
----
-
-## 5. Manter o servidor ligado
-
-- Enquanto a janela do terminal estiver aberta com `npm run servidor` rodando, o sistema fica acessível na rede.
-- Se fechar o terminal ou desligar o servidor, o acesso para. Para voltar a usar, abra de novo o terminal na pasta do projeto e execute `npm run servidor`.
-
-### 5.1 (Opcional) Iniciar com o Windows
-
-Para o servidor subir automaticamente ao ligar o PC:
-
-1. Crie um atalho que execute:
-   - **Destino:** `cmd.exe /k "cd /d C:\ControleFinanceiroDumarreco && npm run servidor"`
-   - (Ajuste `C:\ControleFinanceiroDumarreco` para o caminho real do projeto.)
-2. Pressione `Win + R`, digite `shell:startup` e Enter.
-3. Coloque o atalho dentro da pasta que abrir.
-
-Assim, ao logar no Windows, o servidor será iniciado automaticamente (a janela do CMD ficará aberta).
-
----
-
-## 6. Desenvolvimento (opcional)
-
-Se for alterar o código e testar em rede antes do build:
+### 3.1 Frontend (raiz)
 
 ```cmd
+cd C:\ControleFinanceiroDumarreco
+npm install
+```
+
+### 3.2 Backend (pasta backend)
+
+```cmd
+cd C:\ControleFinanceiroDumarreco\backend
+npm install
+```
+
+---
+
+## 4. Configurar ambiente
+
+### 4.1 Frontend
+
+Na raiz do projeto, crie o arquivo `.env`:
+
+```env
+VITE_API_BASE_URL=http://localhost:3333
+```
+
+> Se este arquivo não existir, a tela de compras funciona em modo legado (localStorage).
+
+### 4.2 Backend
+
+Na pasta `backend`, copie `.env.example` para `.env` e ajuste:
+
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/controle_financeiro?schema=public"
+PORT=3333
+```
+
+Troque usuário/senha conforme seu PostgreSQL local.
+
+---
+
+## 5. Preparar banco de dados (modo recomendado)
+
+Na pasta `backend`:
+
+```cmd
+npm run prisma:generate
+npm run prisma:migrate
+```
+
+Isso cria/aplica as tabelas necessárias (compras, itens, documentos, contas a pagar vinculadas etc.) sem apagar dados existentes no banco.
+
+---
+
+## 6. Executar o sistema local
+
+### 6.1 Terminal 1 - backend
+
+```cmd
+cd C:\ControleFinanceiroDumarreco\backend
 npm run dev
 ```
 
-O sistema ficará acessível em `http://IP-DO-SERVIDOR:5173`. O endereço será mostrado no terminal. Use isso só em ambiente de desenvolvimento; em uso normal, use `npm run build` e `npm run servidor` como acima.
+API disponível em: `http://localhost:3333`
+
+### 6.2 Terminal 2 - frontend
+
+```cmd
+cd C:\ControleFinanceiroDumarreco
+npm run dev
+```
+
+Frontend disponível em: `http://localhost:5173`
 
 ---
 
-## 7. Resumo dos comandos
+## 7. Modo rápido (sem backend)
 
-| Ação                    | Comando           |
-|-------------------------|-------------------|
-| Instalar dependências  | `npm install`     |
-| Gerar build (produção) | `npm run build`   |
-| Subir servidor na rede | `npm run servidor`|
-| Zerar dados            | Menu Configurações → Zerar banco de dados |
+Se quiser abrir só o frontend (sem PostgreSQL/API):
 
----
+```cmd
+cd C:\ControleFinanceiroDumarreco
+npm run dev
+```
 
-## 8. Problemas comuns
-
-- **Outros PCs não acessam:** Verifique se o firewall do Windows não está bloqueando a porta 4173. Pode ser necessário permitir “Node” ou criar uma regra para a porta 4173 (TCP).
-- **Porta em uso:** Se aparecer erro de porta já em uso, você pode usar outra porta, por exemplo:  
-  `npx vite preview --host --port 8080`  
-  e acessar com `http://IP-DO-SERVIDOR:8080`.
-- **Dados não aparecem em outro PC:** É esperado: os dados ficam no navegador de cada máquina. Cada computador tem sua própria “cópia” dos dados no localStorage.
+Nesse modo, os dados ficam no navegador (`localStorage`) da máquina.
 
 ---
 
-*Controle Financeiro Dumarreco – Manual de Instalação em Rede Local*
+## 8. Migrar dados legados do navegador para SQL (opcional)
+
+Se você já usava dados no localStorage e quer levar para PostgreSQL:
+
+1. Exporte os dados do navegador para um JSON (backup).
+2. Execute:
+
+```cmd
+cd C:\ControleFinanceiroDumarreco\backend
+npm run migrate:legacy -- ../backup-localstorage.json
+```
+
+---
+
+## 9. Build para uso local em produção
+
+### 9.1 Frontend build
+
+```cmd
+cd C:\ControleFinanceiroDumarreco
+npm run build
+npm run servidor
+```
+
+Acesse em: `http://localhost:4173`
+
+### 9.2 Backend produção local
+
+```cmd
+cd C:\ControleFinanceiroDumarreco\backend
+npm run build
+npm run prisma:deploy
+npm run start
+```
+
+---
+
+## 10. Backup e restore
+
+### 10.1 PostgreSQL
+
+Backup:
+
+```cmd
+pg_dump -h localhost -U postgres -d controle_financeiro -Fc -f backup.dump
+```
+
+Restore:
+
+```cmd
+pg_restore -h localhost -U postgres -d controle_financeiro --clean --if-exists backup.dump
+```
+
+### 10.2 localStorage (modo legado)
+
+- Abra DevTools do navegador > Application > Local Storage
+- Exporte as chaves `controle-financeiro-*`
+
+---
+
+## 11. Problemas comuns
+
+- **Erro de conexão com banco**
+  - Verifique `DATABASE_URL` no `backend/.env`
+  - Verifique se PostgreSQL está iniciado
+- **Porta 3333 ocupada**
+  - Altere `PORT` no `backend/.env`
+- **Porta 5173 ocupada**
+  - Rode `npm run dev -- --port 5174`
+- **Frontend não usa backend**
+  - Confirme `VITE_API_BASE_URL` na raiz e reinicie `npm run dev`
+- **Dados não aparecem entre navegadores**
+  - Em modo legado, cada navegador possui seu próprio armazenamento local
+
+---
+
+## 12. Resumo rápido de comandos
+
+| Ação | Comando |
+|------|---------|
+| Instalar frontend | `npm install` |
+| Instalar backend | `cd backend && npm install` |
+| Subir frontend dev | `npm run dev` |
+| Subir backend dev | `cd backend && npm run dev` |
+| Gerar client Prisma | `cd backend && npm run prisma:generate` |
+| Rodar migração DB | `cd backend && npm run prisma:migrate` |
+| Migrar legado p/ SQL | `cd backend && npm run migrate:legacy -- ../backup-localstorage.json` |
+
+---
+
+*Controle Financeiro Dumarreco - Manual de Instalação em Computador Local*

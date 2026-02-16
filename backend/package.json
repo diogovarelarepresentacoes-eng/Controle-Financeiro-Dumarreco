@@ -2,6 +2,9 @@
   "name": "controle-financeiro-backend",
   "version": "1.0.0",
   "private": true,
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
@@ -9,6 +12,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
+    "prisma:seed-safe": "prisma db seed",
     "migrate:legacy": "tsx scripts/importLegacyLocalStorage.ts",
     "test": "vitest run"
   },
