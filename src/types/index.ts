@@ -40,18 +40,54 @@ export interface MovimentacaoBancaria {
   data: string;
 }
 
-/** Forma de pagamento na venda: PIX, dinheiro, débito, crédito */
-export type FormaPagamentoVenda = 'pix' | 'dinheiro' | 'debito' | 'credito';
+/** Forma de pagamento na venda: PIX, dinheiro, cartão */
+export type FormaPagamentoVenda = 'pix' | 'dinheiro' | 'cartao';
+
+/** Tipo de cartão: débito ou crédito */
+export type TipoPagamentoCartao = 'debito' | 'credito';
 
 export interface Venda {
   id: string;
   descricao: string;
+  /** Valor líquido para cartão; valor total para outros */
   valor: number;
   formaPagamento: FormaPagamentoVenda;
-  /** Conta que recebeu (obrigatório para PIX, débito e crédito) */
+  /** Conta que recebeu (obrigatório para PIX e cartão) */
   contaBancoId?: string;
   data: string;
   criadoEm: string;
+  /** Campos específicos de cartão (quando formaPagamento === 'cartao') */
+  maquinaCartaoId?: string;
+  /** Nome da máquina (snapshot para relatórios e descrição) */
+  maquinaCartaoNome?: string;
+  tipoPagamentoCartao?: TipoPagamentoCartao;
+  quantidadeParcelas?: number;
+  valorBruto?: number;
+  taxaPercentualCartao?: number;
+  valorTaxaCartao?: number;
+  valorLiquido?: number;
+  observacaoFinanceira?: string;
+}
+
+export interface MaquinaCartao {
+  id: string;
+  nome: string;
+  adquirente: string;
+  descricao?: string;
+  ativo: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaxaMaquinaCartao {
+  id: string;
+  maquinaCartaoId: string;
+  tipoCartao: 'debito' | 'credito';
+  parcelas: number;
+  taxaPercentual: number;
+  ativo: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** Dados mensais para acompanhamento de faturamento (igual à planilha). Inventário e opcionais pelo usuário; faturamento, venda cartão e despesas vêm do sistema. */

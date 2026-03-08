@@ -31,8 +31,7 @@ type VendasPorData = {
   dataFormatada: string
   pix: number
   dinheiro: number
-  debito: number
-  credito: number
+  cartao: number
   total: number
 }
 
@@ -42,8 +41,7 @@ type VendasPorMes = {
   total: number
   pix: number
   dinheiro: number
-  debito: number
-  credito: number
+  cartao: number
 }
 
 export default function Dashboard() {
@@ -64,10 +62,10 @@ export default function Dashboard() {
 
   // Entradas de vendas agrupadas por data (para a tabela)
   const vendasPorData: VendasPorData[] = useMemo(() => {
-    const map = new Map<string, { pix: number; dinheiro: number; debito: number; credito: number }>()
+    const map = new Map<string, { pix: number; dinheiro: number; cartao: number }>()
     vendas.forEach((v) => {
       const key = v.data
-      const cur = map.get(key) ?? { pix: 0, dinheiro: 0, debito: 0, credito: 0 }
+      const cur = map.get(key) ?? { pix: 0, dinheiro: 0, cartao: 0 }
       cur[v.formaPagamento] += v.valor
       map.set(key, cur)
     })
@@ -77,9 +75,8 @@ export default function Dashboard() {
         dataFormatada: format(parseISO(data), 'dd/MM/yyyy', { locale: ptBR }),
         pix: vals.pix,
         dinheiro: vals.dinheiro,
-        debito: vals.debito,
-        credito: vals.credito,
-        total: vals.pix + vals.dinheiro + vals.debito + vals.credito,
+        cartao: vals.cartao,
+        total: vals.pix + vals.dinheiro + vals.cartao,
       }))
       .sort((a, b) => b.data.localeCompare(a.data))
   }, [vendas])
@@ -98,16 +95,14 @@ export default function Dashboard() {
       })
       const pix = vendasNoMes.filter((v) => v.formaPagamento === 'pix').reduce((s, v) => s + v.valor, 0)
       const dinheiro = vendasNoMes.filter((v) => v.formaPagamento === 'dinheiro').reduce((s, v) => s + v.valor, 0)
-      const debito = vendasNoMes.filter((v) => v.formaPagamento === 'debito').reduce((s, v) => s + v.valor, 0)
-      const credito = vendasNoMes.filter((v) => v.formaPagamento === 'credito').reduce((s, v) => s + v.valor, 0)
+      const cartao = vendasNoMes.filter((v) => v.formaPagamento === 'cartao').reduce((s, v) => s + v.valor, 0)
       meses.push({
         mes: format(d, 'MMM', { locale: ptBR }),
         mesAno: format(d, 'MM/yyyy', { locale: ptBR }),
-        total: pix + dinheiro + debito + credito,
+        total: pix + dinheiro + cartao,
         pix,
         dinheiro,
-        debito,
-        credito,
+        cartao,
       })
     }
     return meses
@@ -154,7 +149,7 @@ export default function Dashboard() {
           tone={saldoDinheiro >= 0 ? 'positive' : 'negative'}
           subtitle="Vendas em dinheiro menos boletos pagos em dinheiro"
         />
-        <StatCard title="Total de vendas" value={formatMoney(totalVendas)} tone="positive" subtitle="PIX, dinheiro, debito e credito">
+        <StatCard title="Total de vendas" value={formatMoney(totalVendas)} tone="positive" subtitle="PIX, dinheiro e cartao (valor liquido)">
           <Link to="/vendas" style={{ display: 'inline-block', marginTop: 8, fontSize: '0.9rem' }}>
             Controle de Vendas →
           </Link>
@@ -177,7 +172,7 @@ export default function Dashboard() {
       <div className="card" style={{ marginBottom: 24 }}>
         <h3 style={{ marginBottom: 16 }}>Entradas de vendas por data</h3>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 12 }}>
-          Valores por forma de pagamento (PIX, dinheiro, débito e crédito) em cada dia.
+          Valores por forma de pagamento (PIX, dinheiro, cartão) em cada dia. Cartão exibe valor líquido.
         </p>
         <div className="table-wrap">
           <table>
@@ -186,15 +181,14 @@ export default function Dashboard() {
                 <th>Data</th>
                 <th>PIX</th>
                 <th>Dinheiro</th>
-                <th>Débito</th>
-                <th>Crédito</th>
+                <th>Cartão</th>
                 <th>Total</th>
               </tr>
             </thead>
             <tbody>
               {vendasPorData.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
                     Nenhuma venda registrada.
                   </td>
                 </tr>
@@ -204,8 +198,7 @@ export default function Dashboard() {
                     <td><strong>{row.dataFormatada}</strong></td>
                     <td>{formatMoney(row.pix)}</td>
                     <td>{formatMoney(row.dinheiro)}</td>
-                    <td>{formatMoney(row.debito)}</td>
-                    <td>{formatMoney(row.credito)}</td>
+                    <td>{formatMoney(row.cartao)}</td>
                     <td className="saldo-positivo">{formatMoney(row.total)}</td>
                   </tr>
                 ))
@@ -239,8 +232,7 @@ export default function Dashboard() {
               />
               <Bar dataKey="pix" name="PIX" fill="#00ba7c" radius={[4, 4, 0, 0]} />
               <Bar dataKey="dinheiro" name="Dinheiro" fill="#ffad1f" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="debito" name="Débito" fill="#1d9bf0" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="credito" name="Crédito" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="cartao" name="Cartão" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -343,7 +335,7 @@ export default function Dashboard() {
           </div>
         )}
         <p style={{ marginTop: 12, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-          O saldo é atualizado com as vendas (PIX, débito, crédito) em Controle de Vendas e com as baixas de boleto pela opção &quot;Conta banco&quot;.
+          O saldo é atualizado com as vendas (PIX, cartão) em Controle de Vendas e com as baixas de boleto pela opção &quot;Conta banco&quot;.
         </p>
       </div>
     </>

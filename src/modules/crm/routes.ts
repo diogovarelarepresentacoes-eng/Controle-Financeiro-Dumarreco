@@ -1,0 +1,5 @@
+export const ROTA_CRM_INBOX = '/crm/inbox'
+export const ROTA_CRM_ATENDIMENTO = '/crm/atendimento'
+export const ROTA_CRM_KANBAN = '/crm/kanban'
+export const ROTA_CRM_METAS = '/crm/metas'
+export const ROTA_CRM_CONFIG = '/crm/configuracoes'

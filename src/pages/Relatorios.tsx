@@ -184,7 +184,7 @@ export default function Relatorios() {
                     <td>{v.descricao}</td>
                     <td>{formatMoney(v.valor)}</td>
                     <td>
-                      {v.formaPagamento === 'pix' ? 'PIX' : v.formaPagamento === 'dinheiro' ? 'Dinheiro' : v.formaPagamento === 'debito' ? 'Débito' : 'Crédito'}
+                      {v.formaPagamento === 'pix' ? 'PIX' : v.formaPagamento === 'dinheiro' ? 'Dinheiro' : v.tipoPagamentoCartao === 'debito' ? 'Cartão Débito' : v.tipoPagamentoCartao === 'credito' ? `Cartão Crédito ${v.quantidadeParcelas ?? 1}x` : 'Cartão'}
                     </td>
                     <td>{v.contaBancoId ? nomeConta(v.contaBancoId) : '-'}</td>
                   </tr>

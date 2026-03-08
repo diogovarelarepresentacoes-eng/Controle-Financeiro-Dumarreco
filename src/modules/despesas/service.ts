@@ -31,6 +31,7 @@ function gerarRecorrencias(list: Despesa[]): Despesa[] {
   const limiteGeracao = format(endOfMonth(new Date()), 'yyyy-MM-dd')
   let resultado = [...list]
   const recorrentes = resultado.filter((d) => d.recorrente && d.periodicidade)
+  const deletedMarkers = despesasRepository.getDeletedRecurrenceMarkers()
 
   for (const mestre of recorrentes) {
     const origemId = mestre.recorrenciaOrigemId ?? mestre.id
@@ -40,8 +41,9 @@ function gerarRecorrencias(list: Despesa[]): Despesa[] {
     while (true) {
       const proxima = proximaData(maxData, mestre.periodicidade!)
       if (proxima > limiteGeracao) break
+      const foiExcluida = deletedMarkers.some((m) => m.origemId === origemId && m.dataVencimento === proxima)
       const jaExiste = resultado.some((d) => (d.recorrenciaOrigemId ?? d.id) === origemId && d.dataVencimento === proxima)
-      if (!jaExiste) {
+      if (!jaExiste && !foiExcluida) {
         const now = new Date().toISOString()
         resultado.push({
           ...mestre,
@@ -141,6 +143,25 @@ export const despesasService = {
   },
 
   remove: (id: string): void => {
+    const existente = despesasRepository.getById(id)
+    if (!existente) throw new Error('Despesa nao encontrada')
+
+    const origemId = existente.recorrenciaOrigemId ?? existente.id
+
+    // Se for mestre recorrente, remove todo o grupo e limpa marcadores.
+    if (existente.recorrente && (existente.recorrenciaOrigemId === existente.id || existente.recorrenciaOrigemId === undefined)) {
+      const todos = despesasRepository.getAll()
+      const restante = todos.filter((d) => (d.recorrenciaOrigemId ?? d.id) !== origemId)
+      despesasRepository.saveAll(restante)
+      despesasRepository.clearDeletedRecurrenceMarkersByOrigem(origemId)
+      return
+    }
+
+    // Se for uma ocorrência recorrente, marca como excluída para não ser recriada.
+    if (existente.recorrenciaOrigemId) {
+      despesasRepository.addDeletedRecurrenceMarker({ origemId, dataVencimento: existente.dataVencimento })
+    }
+
     despesasRepository.delete(id)
   },
 

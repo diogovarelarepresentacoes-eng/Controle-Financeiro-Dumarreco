@@ -1,4 +1,10 @@
 import { z } from 'zod'
+import { config as loadEnv } from 'dotenv'
+import { resolve } from 'node:path'
+
+loadEnv()
+loadEnv({ path: resolve(process.cwd(), '.env') })
+loadEnv({ path: resolve(process.cwd(), 'backend', '.env') })
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),

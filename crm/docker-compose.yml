@@ -1,0 +1,73 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: crm_dumarreco_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: crm_dumarreco
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - crm_dumarreco_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d crm_dumarreco"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./apps/api
+    container_name: crm_dumarreco_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      API_PORT: 4000
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/crm_dumarreco?schema=public
+      RUN_SEED_ON_STARTUP: "false"
+      BACKUP_BEFORE_MIGRATE: "false"
+      WHATSAPP_WEBHOOK_SECRET: change-me
+      REMINDER_JOB_INTERVAL_MINUTES: 60
+      CUSTOMER_SCORE_JOB_INTERVAL_HOURS: 24
+      QUOTE_RECOVERY_JOB_INTERVAL_MINUTES: 60
+      SECRET_KEY: change-me-super-secret-key
+      APP_BASE_URL: http://localhost:4000
+    ports:
+      - "4000:4000"
+
+  web:
+    build:
+      context: ./apps/web
+    container_name: crm_dumarreco_web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    ports:
+      - "3001:3001"
+
+  db-backup:
+    image: postgres:16-alpine
+    container_name: crm_dumarreco_db_backup
+    profiles: ["backup"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: postgres
+    volumes:
+      - ./backups:/backups
+    command: >
+      sh -c "pg_dump -h db -U postgres -d crm_dumarreco > /backups/backup-$$(date +%Y%m%d-%H%M%S).sql && echo backup concluido"
+
+volumes:
+  crm_dumarreco_pgdata:
+    name: crm_dumarreco_pgdata

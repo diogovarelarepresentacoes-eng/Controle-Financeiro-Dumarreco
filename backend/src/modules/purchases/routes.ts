@@ -1,11 +1,12 @@
 import { Router } from 'express'
 import { purchasesController } from './controller'
+import { asyncHandler } from '../../lib/asyncHandler'
 
 export const purchasesRouter = Router()
 
-purchasesRouter.get('/', purchasesController.list)
-purchasesRouter.get('/:id', purchasesController.getById)
-purchasesRouter.post('/manual', purchasesController.createManual)
-purchasesRouter.post('/import-xml', purchasesController.importXml)
-purchasesRouter.post('/:id/generate-payables', purchasesController.generatePayables)
-purchasesRouter.delete('/:id', purchasesController.remove)
+purchasesRouter.get('/', asyncHandler(purchasesController.list))
+purchasesRouter.get('/:id', asyncHandler(purchasesController.getById))
+purchasesRouter.post('/manual', asyncHandler(purchasesController.createManual))
+purchasesRouter.post('/import-xml', asyncHandler(purchasesController.importXml))
+purchasesRouter.post('/:id/generate-payables', asyncHandler(purchasesController.generatePayables))
+purchasesRouter.delete('/:id', asyncHandler(purchasesController.remove))

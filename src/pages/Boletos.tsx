@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import type { Boleto } from '../types'
 import { storageBoletos } from '../services/storage'
 import { applyCurrencyMask, parseCurrencyFromInput, formatCurrencyForInput } from '../utils/currencyMask'
-import { format } from 'date-fns'
-import ptBR from 'date-fns/locale/pt-BR'
+import { formatDateBR } from '../utils/date'
 
 export default function Boletos() {
   const [boletos, setBoletos] = useState<Boleto[]>([])
@@ -143,7 +142,7 @@ export default function Boletos() {
                 <tr key={b.id}>
                   <td>{b.descricao}</td>
                   <td>{formatMoney(b.valor)}</td>
-                  <td>{b.vencimento ? format(new Date(b.vencimento), 'dd/MM/yyyy', { locale: ptBR }) : '-'}</td>
+                  <td>{formatDateBR(b.vencimento)}</td>
                   <td><span className="badge badge-warning">Pendente</span></td>
                   <td>
                     <button type="button" className="btn btn-secondary" onClick={() => openEdit(b)}>
@@ -182,7 +181,7 @@ export default function Boletos() {
                 <tr key={b.id}>
                   <td>{b.descricao}</td>
                   <td>{formatMoney(b.valor)}</td>
-                  <td>{b.dataPagamento ? format(new Date(b.dataPagamento), 'dd/MM/yyyy', { locale: ptBR }) : '-'}</td>
+                  <td>{formatDateBR(b.dataPagamento)}</td>
                   <td>
                     {b.origemPagamento === 'conta_banco' ? 'Conta banco' : b.origemPagamento === 'dinheiro' ? 'Dinheiro' : '-'}
                   </td>

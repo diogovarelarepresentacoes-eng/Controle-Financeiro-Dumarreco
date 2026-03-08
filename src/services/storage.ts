@@ -11,6 +11,7 @@ const KEY_COMPRAS_ITENS = 'controle-financeiro-compras-itens';
 const KEY_COMPRAS_DOCUMENTOS = 'controle-financeiro-compras-documentos';
 const KEY_FORNECEDORES = 'controle-financeiro-fornecedores';
 const KEY_IMPORT_LOGS = 'controle-financeiro-importacao-xml-logs';
+const KEY_TAXAS_CARTAO = 'controle-financeiro-taxas-cartao';
 
 /** Remove todos os dados do sistema. */
 export function zerarBancoDeDados(): void {
@@ -25,6 +26,7 @@ export function zerarBancoDeDados(): void {
   localStorage.removeItem(KEY_COMPRAS_DOCUMENTOS);
   localStorage.removeItem(KEY_FORNECEDORES);
   localStorage.removeItem(KEY_IMPORT_LOGS);
+  localStorage.removeItem(KEY_TAXAS_CARTAO);
 }
 
 function getContas(): ContaBanco[] {
@@ -66,10 +68,29 @@ function setMovimentacoes(mov: MovimentacaoBancaria[]) {
   localStorage.setItem(KEY_MOVIMENTACOES, JSON.stringify(mov));
 }
 
+function migrarVendaLegada(v: Venda & { formaPagamento?: string }): Venda {
+  const fp = v.formaPagamento as string | undefined
+  if (fp === 'debito' || fp === 'credito') {
+    return {
+      ...v,
+      formaPagamento: 'cartao',
+      tipoPagamentoCartao: fp === 'debito' ? 'debito' : 'credito',
+      quantidadeParcelas: 1,
+      valorBruto: v.valor,
+      valorLiquido: v.valor,
+    } as Venda;
+  }
+  return v as Venda;
+}
+
 function getVendas(): Venda[] {
   try {
     const data = localStorage.getItem(KEY_VENDAS);
-    return data ? JSON.parse(data) : [];
+    const raw: (Venda & { formaPagamento?: string })[] = data ? JSON.parse(data) : [];
+    const vendas = raw.map((v) => migrarVendaLegada(v));
+    const changed = raw.some((v) => (v.formaPagamento as string) === 'debito' || (v.formaPagamento as string) === 'credito');
+    if (changed) setVendas(vendas);
+    return vendas;
   } catch {
     return [];
   }
@@ -237,21 +258,42 @@ export function reverterBaixaBoleto(boleto: Boleto) {
   return revertido;
 }
 
-/** Registra uma venda. Se PIX/débito/crédito com contaBancoId, credita na conta. */
+/** Valor a creditar na conta: líquido para cartão, valor total para outros */
+function valorParaMovimentacao(venda: Venda): number {
+  if (venda.formaPagamento === 'cartao' && venda.valorLiquido != null) {
+    return venda.valorLiquido;
+  }
+  return venda.valor;
+}
+
+/** Descrição da movimentação para cartão com rastreabilidade */
+function descricaoMovimentacao(venda: Venda): string {
+  if (venda.formaPagamento === 'cartao' && venda.valorBruto != null && venda.valorTaxaCartao != null && venda.valorLiquido != null) {
+    const tipo = venda.tipoPagamentoCartao === 'debito' ? 'DÉBITO' : `CRÉDITO ${venda.quantidadeParcelas ?? 1}x`;
+    const maq = venda.maquinaCartaoNome ? ` ${venda.maquinaCartaoNome}` : '';
+    const fmt = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
+    return `Venda: ${venda.descricao} (CARTÃO${maq} ${tipo}) | Bruto: ${fmt(venda.valorBruto)} | Taxa: ${fmt(venda.valorTaxaCartao)} | Líquido: ${fmt(venda.valorLiquido)}`;
+  }
+  const forma = venda.formaPagamento === 'pix' ? 'PIX' : venda.formaPagamento === 'cartao' ? 'CARTÃO' : venda.formaPagamento.toUpperCase();
+  return `Venda: ${venda.descricao} (${forma})`;
+}
+
+/** Registra uma venda. Se PIX/cartão com contaBancoId, credita na conta (valor líquido para cartão). */
 export function registrarVenda(venda: Venda): Venda {
   storageVendas.save(venda);
-  const formaCartaoOuPix = venda.formaPagamento === 'pix' || venda.formaPagamento === 'debito' || venda.formaPagamento === 'credito';
+  const formaCartaoOuPix = venda.formaPagamento === 'pix' || venda.formaPagamento === 'cartao';
   if (formaCartaoOuPix && venda.contaBancoId) {
+    const valor = valorParaMovimentacao(venda);
     storageMovimentacoes.add({
       id: crypto.randomUUID(),
       contaBancoId: venda.contaBancoId,
       tipo: 'entrada',
-      valor: venda.valor,
-      descricao: `Venda: ${venda.descricao} (${venda.formaPagamento.toUpperCase()})`,
+      valor,
+      descricao: descricaoMovimentacao(venda),
       vendaId: venda.id,
       data: venda.data,
     });
-    atualizarSaldoConta(venda.contaBancoId, venda.valor, 'entrada');
+    atualizarSaldoConta(venda.contaBancoId, valor, 'entrada');
   }
   return venda;
 }
@@ -269,10 +311,21 @@ function reverterMovimentacaoVenda(vendaId: string) {
 export function atualizarVenda(venda: Venda): Venda {
   const antiga = storageVendas.getById(venda.id);
   if (antiga) {
-    const formaCartaoOuPixAntiga = antiga.formaPagamento === 'pix' || antiga.formaPagamento === 'debito' || antiga.formaPagamento === 'credito';
+    const formaCartaoOuPixAntiga = antiga.formaPagamento === 'pix' || antiga.formaPagamento === 'cartao';
     if (formaCartaoOuPixAntiga && antiga.contaBancoId) {
       reverterMovimentacaoVenda(antiga.id);
     }
   }
   return registrarVenda(venda);
+}
+
+/** Exclui uma venda e reverte movimentações/saldo (se houver). */
+export function excluirVenda(vendaId: string): void {
+  const existente = storageVendas.getById(vendaId);
+  if (!existente) return;
+  const formaCartaoOuPix = existente.formaPagamento === 'pix' || existente.formaPagamento === 'cartao';
+  if (formaCartaoOuPix && existente.contaBancoId) {
+    reverterMovimentacaoVenda(existente.id);
+  }
+  storageVendas.delete(existente.id);
 }

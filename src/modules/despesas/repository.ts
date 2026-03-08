@@ -1,6 +1,13 @@
 import type { Despesa } from './model'
 
 const KEY_DESPESAS = 'controle-financeiro-despesas'
+const KEY_DESPESAS_DELETED_RECURRENCES = 'controle-financeiro-despesas-deleted-recurrences'
+
+export type DeletedRecurrenceMarker = {
+  origemId: string
+  dataVencimento: string
+  deletedAt: string
+}
 
 function getRaw(): Despesa[] {
   try {
@@ -13,6 +20,19 @@ function getRaw(): Despesa[] {
 
 function saveRaw(list: Despesa[]): void {
   localStorage.setItem(KEY_DESPESAS, JSON.stringify(list))
+}
+
+function getDeletedRecurrencesRaw(): DeletedRecurrenceMarker[] {
+  try {
+    const data = localStorage.getItem(KEY_DESPESAS_DELETED_RECURRENCES)
+    return data ? (JSON.parse(data) as DeletedRecurrenceMarker[]) : []
+  } catch {
+    return []
+  }
+}
+
+function saveDeletedRecurrencesRaw(list: DeletedRecurrenceMarker[]): void {
+  localStorage.setItem(KEY_DESPESAS_DELETED_RECURRENCES, JSON.stringify(list))
 }
 
 function seedExemplos(): Despesa[] {
@@ -93,6 +113,19 @@ export const despesasRepository = {
     else list.push(despesa)
     saveRaw(list)
     return despesa
+  },
+  getDeletedRecurrenceMarkers: () => getDeletedRecurrencesRaw(),
+  addDeletedRecurrenceMarker: (marker: Omit<DeletedRecurrenceMarker, 'deletedAt'>) => {
+    const list = getDeletedRecurrencesRaw()
+    const exists = list.some((m) => m.origemId === marker.origemId && m.dataVencimento === marker.dataVencimento)
+    if (!exists) {
+      list.push({ ...marker, deletedAt: new Date().toISOString() })
+      saveDeletedRecurrencesRaw(list)
+    }
+  },
+  clearDeletedRecurrenceMarkersByOrigem: (origemId: string) => {
+    const list = getDeletedRecurrencesRaw().filter((m) => m.origemId !== origemId)
+    saveDeletedRecurrencesRaw(list)
   },
   delete: (id: string) => {
     const list = getRaw().filter((d) => d.id !== id)

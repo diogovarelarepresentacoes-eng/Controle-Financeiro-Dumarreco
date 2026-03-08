@@ -13,6 +13,7 @@ import {
   type TipoDespesa,
 } from '../modules/despesas/model'
 import { applyCurrencyMask, formatCurrencyForInput, parseCurrencyFromInput } from '../utils/currencyMask'
+import { formatDateBR } from '../utils/date'
 
 const STATUS_OPTIONS: Array<{ value: StatusDespesa; label: string }> = [
   { value: 'pendente', label: 'Pendente' },
@@ -178,8 +179,12 @@ export default function Despesas() {
 
   const excluir = (id: string) => {
     if (!confirm('Deseja excluir esta despesa?')) return
-    despesasController.excluir(id)
-    load()
+    try {
+      despesasController.excluir(id)
+      load()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erro ao excluir despesa.')
+    }
   }
 
   const exportarRelatorioPdf = () => {
@@ -373,8 +378,8 @@ export default function Despesas() {
                     <td>{d.categoria}</td>
                     <td>{d.tipo}</td>
                     <td>{formatMoney(d.valor)}</td>
-                    <td>{format(new Date(d.dataVencimento), 'dd/MM/yyyy', { locale: ptBR })}</td>
-                    <td>{d.dataPagamento ? format(new Date(d.dataPagamento), 'dd/MM/yyyy', { locale: ptBR }) : '-'}</td>
+                    <td>{formatDateBR(d.dataVencimento)}</td>
+                    <td>{formatDateBR(d.dataPagamento)}</td>
                     <td>
                       <span className={`badge ${d.status === 'pago' ? 'badge-success' : d.status === 'atrasado' ? 'badge-warning' : 'badge-info'}`}>
                         {d.status}

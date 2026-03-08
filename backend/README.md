@@ -12,6 +12,15 @@ API REST para o modulo de compras mensal com PostgreSQL + Prisma.
 ## Como rodar
 
 1. Copie `backend/.env.example` para `backend/.env` e ajuste o `DATABASE_URL`.
+
+### Erro "Authentication failed" / credenciais invalidas
+
+Se aparecer `Authentication failed... the provided database credentials for postgres are not valid`:
+
+- **PostgreSQL local (Windows)**: Muitas instalacoes usam senha vazia. Em `backend/.env`, use:
+  `DATABASE_URL="postgresql://postgres:@localhost:5432/controle_financeiro?schema=public"`
+- **Senha diferente**: Substitua `postgres` apos os dois pontos pela sua senha.
+- **Criar o banco**: Se o banco nao existir, crie com `createdb -U postgres controle_financeiro` ou pelo pgAdmin.
 2. Instale dependencias:
    - `cd backend`
    - `npm install`

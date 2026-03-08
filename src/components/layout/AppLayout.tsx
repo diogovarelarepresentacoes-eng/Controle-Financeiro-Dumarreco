@@ -1,19 +1,38 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ThemeToggle } from '../ui/ThemeToggle'
 import { ROTA_DESPESAS } from '../../modules/despesas/routes'
 import { ROTA_COMPRAS } from '../../modules/compras/routes'
+import { ROTA_CRM_ATENDIMENTO, ROTA_CRM_CONFIG, ROTA_CRM_INBOX, ROTA_CRM_KANBAN, ROTA_CRM_METAS } from '../../modules/crm/routes'
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [menuFinanceiroAberto, setMenuFinanceiroAberto] = useState(false)
-  const [menuRelatoriosAberto, setMenuRelatoriosAberto] = useState(false)
 
   const financeiroAtivo = location.pathname === '/boletos' || location.pathname === '/baixa-boleto'
   const relatoriosAtivo = location.pathname.startsWith('/relatorios')
+  const cadastrosAtivo = location.pathname.startsWith('/produtos') || location.pathname.startsWith('/importar-produtos')
+  const estoqueAtivo = location.pathname.startsWith('/atualizar-estoque')
+  const crmAtivo = location.pathname.startsWith('/crm/')
+  const configAtivo = location.pathname.startsWith('/configuracoes')
+  const [menuFinanceiroAberto, setMenuFinanceiroAberto] = useState(financeiroAtivo)
+  const [menuRelatoriosAberto, setMenuRelatoriosAberto] = useState(relatoriosAtivo)
+  const [menuCadastrosAberto, setMenuCadastrosAberto] = useState(cadastrosAtivo)
+  const [menuEstoqueAberto, setMenuEstoqueAberto] = useState(estoqueAtivo)
+  const [menuCrmAberto, setMenuCrmAberto] = useState(crmAtivo)
+  const [menuConfigAberto, setMenuConfigAberto] = useState(configAtivo)
+
+  useEffect(() => {
+    if (financeiroAtivo) setMenuFinanceiroAberto(true)
+    if (relatoriosAtivo) setMenuRelatoriosAberto(true)
+    if (cadastrosAtivo) setMenuCadastrosAberto(true)
+    if (estoqueAtivo) setMenuEstoqueAberto(true)
+    if (crmAtivo) setMenuCrmAberto(true)
+    if (configAtivo) setMenuConfigAberto(true)
+    setMobileMenuOpen(false)
+  }, [location.pathname, financeiroAtivo, relatoriosAtivo, cadastrosAtivo, estoqueAtivo, crmAtivo, configAtivo])
 
   const nav = (
     <nav className="sidebar-nav">
@@ -40,6 +59,37 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <NavLink to={ROTA_COMPRAS} onClick={() => setMobileMenuOpen(false)}>Compras</NavLink>
       <NavLink to={ROTA_DESPESAS} onClick={() => setMobileMenuOpen(false)}>Despesas</NavLink>
 
+      <div className={`sidebar-group ${cadastrosAtivo ? 'active' : ''}`}>
+        <button
+          type="button"
+          className="sidebar-group-title sidebar-group-trigger"
+          onClick={() => setMenuCadastrosAberto((prev) => !prev)}
+        >
+          Cadastros <span>{menuCadastrosAberto ? '▾' : '▸'}</span>
+        </button>
+        {menuCadastrosAberto && (
+          <div className="sidebar-submenu">
+            <NavLink to="/produtos" onClick={() => setMobileMenuOpen(false)}>Produtos</NavLink>
+            <NavLink to="/importar-produtos" onClick={() => setMobileMenuOpen(false)}>Importar Produtos (Planilha)</NavLink>
+          </div>
+        )}
+      </div>
+
+      <div className={`sidebar-group ${estoqueAtivo ? 'active' : ''}`}>
+        <button
+          type="button"
+          className="sidebar-group-title sidebar-group-trigger"
+          onClick={() => setMenuEstoqueAberto((prev) => !prev)}
+        >
+          Estoque <span>{menuEstoqueAberto ? '▾' : '▸'}</span>
+        </button>
+        {menuEstoqueAberto && (
+          <div className="sidebar-submenu">
+            <NavLink to="/atualizar-estoque" onClick={() => setMobileMenuOpen(false)}>Atualizar Estoque (Planilha)</NavLink>
+          </div>
+        )}
+      </div>
+
       <div className={`sidebar-group ${relatoriosAtivo ? 'active' : ''}`}>
         <button
           type="button"
@@ -57,7 +107,39 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </div>
 
       <NavLink to="/faturamento" onClick={() => setMobileMenuOpen(false)}>Faturamento</NavLink>
-      <NavLink to="/configuracoes" onClick={() => setMobileMenuOpen(false)}>Configuracoes</NavLink>
+      <div className={`sidebar-group ${crmAtivo ? 'active' : ''}`}>
+        <button
+          type="button"
+          className="sidebar-group-title sidebar-group-trigger"
+          onClick={() => setMenuCrmAberto((prev) => !prev)}
+        >
+          CRM WhatsApp <span>{menuCrmAberto ? '▾' : '▸'}</span>
+        </button>
+        {menuCrmAberto && (
+          <div className="sidebar-submenu">
+            <NavLink to={ROTA_CRM_INBOX} onClick={() => setMobileMenuOpen(false)}>Inbox</NavLink>
+            <NavLink to={ROTA_CRM_ATENDIMENTO} onClick={() => setMobileMenuOpen(false)}>Atendimento</NavLink>
+            <NavLink to={ROTA_CRM_KANBAN} onClick={() => setMobileMenuOpen(false)}>Kanban</NavLink>
+            <NavLink to={ROTA_CRM_METAS} onClick={() => setMobileMenuOpen(false)}>Metas</NavLink>
+            <NavLink to={ROTA_CRM_CONFIG} onClick={() => setMobileMenuOpen(false)}>Configurações IA</NavLink>
+          </div>
+        )}
+      </div>
+      <div className={`sidebar-group ${configAtivo ? 'active' : ''}`}>
+        <button
+          type="button"
+          className="sidebar-group-title sidebar-group-trigger"
+          onClick={() => setMenuConfigAberto((prev) => !prev)}
+        >
+          Configuracoes <span>{menuConfigAberto ? '▾' : '▸'}</span>
+        </button>
+        {menuConfigAberto && (
+          <div className="sidebar-submenu">
+            <NavLink to="/configuracoes" onClick={() => setMobileMenuOpen(false)}>Geral</NavLink>
+            <NavLink to="/configuracoes/maquinas-cartao" onClick={() => setMobileMenuOpen(false)}>Maquinas de Cartao</NavLink>
+          </div>
+        )}
+      </div>
     </nav>
   )
 
@@ -81,18 +163,26 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       <AnimatePresence>
         {mobileMenuOpen && (
-          <motion.aside
-            className="sidebar mobile-sidebar"
-            initial={{ x: -280 }}
-            animate={{ x: 0 }}
-            exit={{ x: -280 }}
-            transition={{ duration: 0.2 }}
-          >
-            <div className="sidebar-header">
-              <strong>Navegacao</strong>
-            </div>
-            {nav}
-          </motion.aside>
+          <>
+            <button
+              type="button"
+              className="mobile-sidebar-backdrop no-print"
+              aria-label="Fechar menu"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+            <motion.aside
+              className="sidebar mobile-sidebar"
+              initial={{ x: -280 }}
+              animate={{ x: 0 }}
+              exit={{ x: -280 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="sidebar-header">
+                <strong>Navegacao</strong>
+              </div>
+              {nav}
+            </motion.aside>
+          </>
         )}
       </AnimatePresence>
 

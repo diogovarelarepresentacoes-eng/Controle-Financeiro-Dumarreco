@@ -1,34 +1,80 @@
-import { useState, useEffect } from 'react'
-import type { Venda, FormaPagamentoVenda } from '../types'
-import { storageVendas, storageContas, registrarVenda, atualizarVenda } from '../services/storage'
+import { useState, useEffect, useMemo } from 'react'
+import type { Venda, FormaPagamentoVenda, TipoPagamentoCartao } from '../types'
+import { storageVendas, storageContas, registrarVenda, atualizarVenda, excluirVenda } from '../services/storage'
 import { applyCurrencyMask, parseCurrencyFromInput, formatCurrencyForInput } from '../utils/currencyMask'
-import { format } from 'date-fns'
-import ptBR from 'date-fns/locale/pt-BR'
+import { formatDateBR, parseDateOnly } from '../utils/date'
+import { maquinasCartaoGateway } from '../services/maquinasCartaoGateway'
+import { calcularValorLiquidoCartao } from '../services/taxaCartaoService'
 
-const FORMAS: FormaPagamentoVenda[] = ['pix', 'dinheiro', 'debito', 'credito']
+const FORMAS: FormaPagamentoVenda[] = ['pix', 'dinheiro', 'cartao']
+
+const MODALIDADES_CARTAO: { value: string; tipo: TipoPagamentoCartao; parcelas: number; label: string }[] = [
+  { value: 'debito_1', tipo: 'debito', parcelas: 1, label: 'Débito' },
+  { value: 'credito_1', tipo: 'credito', parcelas: 1, label: 'Crédito 1x' },
+  { value: 'credito_2', tipo: 'credito', parcelas: 2, label: 'Crédito 2x' },
+  { value: 'credito_3', tipo: 'credito', parcelas: 3, label: 'Crédito 3x' },
+  { value: 'credito_4', tipo: 'credito', parcelas: 4, label: 'Crédito 4x' },
+  { value: 'credito_5', tipo: 'credito', parcelas: 5, label: 'Crédito 5x' },
+  { value: 'credito_6', tipo: 'credito', parcelas: 6, label: 'Crédito 6x' },
+  { value: 'credito_7', tipo: 'credito', parcelas: 7, label: 'Crédito 7x' },
+  { value: 'credito_8', tipo: 'credito', parcelas: 8, label: 'Crédito 8x' },
+  { value: 'credito_9', tipo: 'credito', parcelas: 9, label: 'Crédito 9x' },
+  { value: 'credito_10', tipo: 'credito', parcelas: 10, label: 'Crédito 10x' },
+  { value: 'credito_11', tipo: 'credito', parcelas: 11, label: 'Crédito 11x' },
+  { value: 'credito_12', tipo: 'credito', parcelas: 12, label: 'Crédito 12x' },
+]
 
 const emptyForm = {
   descricao: '',
   valor: '',
   formaPagamento: 'pix' as FormaPagamentoVenda,
+  maquinaCartaoId: '',
+  modalidadeCartao: '',
   contaBancoId: '',
 }
 
 export default function Vendas() {
   const [vendas, setVendas] = useState<Venda[]>([])
   const [contas, setContas] = useState(storageContas.getAll().filter((c) => c.ativo))
+  const [maquinas, setMaquinas] = useState<{ id: string; nome: string }[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
+  const [taxaConfigurada, setTaxaConfigurada] = useState<{ taxaPercentual: number } | null>(null)
 
   const load = () => {
     setVendas(storageVendas.getAll())
     setContas(storageContas.getAll().filter((c) => c.ativo))
+    maquinasCartaoGateway.list(true).then((m) => setMaquinas(m.map((x) => ({ id: x.id, nome: x.nome }))))
   }
 
   useEffect(() => {
     load()
   }, [])
+
+  const exigeContaBanco = form.formaPagamento === 'pix' || form.formaPagamento === 'cartao'
+
+  const modalidadeSelecionada = useMemo(() => {
+    if (form.formaPagamento !== 'cartao' || !form.modalidadeCartao) return null
+    return MODALIDADES_CARTAO.find((m) => m.value === form.modalidadeCartao)
+  }, [form.formaPagamento, form.modalidadeCartao])
+
+  useEffect(() => {
+    if (form.formaPagamento !== 'cartao' || !form.maquinaCartaoId || !modalidadeSelecionada) {
+      setTaxaConfigurada(null)
+      return
+    }
+    maquinasCartaoGateway
+      .getTaxaByModalidade(form.maquinaCartaoId, modalidadeSelecionada.tipo, modalidadeSelecionada.parcelas)
+      .then((t) => setTaxaConfigurada(t ? { taxaPercentual: t.taxaPercentual } : null))
+      .catch(() => setTaxaConfigurada(null))
+  }, [form.formaPagamento, form.maquinaCartaoId, modalidadeSelecionada?.tipo, modalidadeSelecionada?.parcelas])
+
+  const valorBruto = parseCurrencyFromInput(form.valor)
+  const calculoCartao = useMemo(() => {
+    if (form.formaPagamento !== 'cartao' || !taxaConfigurada || valorBruto <= 0) return null
+    return calcularValorLiquidoCartao(valorBruto, taxaConfigurada.taxaPercentual)
+  }, [form.formaPagamento, taxaConfigurada, valorBruto])
 
   const openNew = () => {
     setEditingId(null)
@@ -38,35 +84,79 @@ export default function Vendas() {
 
   const openEdit = (v: Venda) => {
     setEditingId(v.id)
+    const modalidade =
+      v.formaPagamento === 'cartao' && v.tipoPagamentoCartao && v.quantidadeParcelas
+        ? MODALIDADES_CARTAO.find(
+            (m) => m.tipo === v.tipoPagamentoCartao && m.parcelas === v.quantidadeParcelas
+          )?.value ?? ''
+        : ''
     setForm({
       descricao: v.descricao,
-      valor: formatCurrencyForInput(v.valor),
+      valor: formatCurrencyForInput(v.valorBruto ?? v.valor),
       formaPagamento: v.formaPagamento,
+      maquinaCartaoId: v.maquinaCartaoId ?? '',
+      modalidadeCartao: modalidade,
       contaBancoId: v.contaBancoId ?? '',
     })
     setModalOpen(true)
   }
-
-  const exigeContaBanco = form.formaPagamento === 'pix' || form.formaPagamento === 'debito' || form.formaPagamento === 'credito'
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     const valor = parseCurrencyFromInput(form.valor)
     if (!form.descricao.trim() || valor <= 0) return
     if (exigeContaBanco && !form.contaBancoId) {
-      alert('Selecione a conta banco que recebeu o pagamento (PIX, débito e crédito).')
+      alert('Selecione a conta banco que recebeu o pagamento (PIX e cartão).')
       return
+    }
+    if (form.formaPagamento === 'cartao') {
+      if (!form.maquinaCartaoId) {
+        alert('Selecione a máquina de cartão utilizada na venda.')
+        return
+      }
+      if (!modalidadeSelecionada) {
+        alert('Selecione o tipo de cartão (Débito ou Crédito parcelado).')
+        return
+      }
+      if (!taxaConfigurada) {
+        alert('Não existe taxa cadastrada para esta máquina de cartão nesta modalidade.')
+        return
+      }
     }
     const data = editingId ? (storageVendas.getById(editingId)?.data ?? new Date().toISOString().slice(0, 10)) : new Date().toISOString().slice(0, 10)
     const criadoEm = editingId ? (storageVendas.getById(editingId)?.criadoEm ?? new Date().toISOString()) : new Date().toISOString()
-    const venda: Venda = {
-      id: editingId ?? crypto.randomUUID(),
-      descricao: form.descricao.trim(),
-      valor,
-      formaPagamento: form.formaPagamento,
-      contaBancoId: exigeContaBanco ? form.contaBancoId : undefined,
-      data,
-      criadoEm,
+
+    let venda: Venda
+    if (form.formaPagamento === 'cartao' && form.maquinaCartaoId && modalidadeSelecionada && taxaConfigurada) {
+      const maquina = maquinas.find((m) => m.id === form.maquinaCartaoId)
+      const { valorTaxa, valorLiquido } = calcularValorLiquidoCartao(valor, taxaConfigurada.taxaPercentual)
+      venda = {
+        id: editingId ?? crypto.randomUUID(),
+        descricao: form.descricao.trim(),
+        valor: valorLiquido,
+        formaPagamento: 'cartao',
+        maquinaCartaoId: form.maquinaCartaoId,
+        maquinaCartaoNome: maquina?.nome,
+        tipoPagamentoCartao: modalidadeSelecionada.tipo,
+        quantidadeParcelas: modalidadeSelecionada.parcelas,
+        valorBruto: valor,
+        taxaPercentualCartao: taxaConfigurada.taxaPercentual,
+        valorTaxaCartao: valorTaxa,
+        valorLiquido,
+        contaBancoId: form.contaBancoId,
+        data,
+        criadoEm,
+      }
+    } else {
+      venda = {
+        id: editingId ?? crypto.randomUUID(),
+        descricao: form.descricao.trim(),
+        valor,
+        formaPagamento: form.formaPagamento,
+        contaBancoId: exigeContaBanco ? form.contaBancoId : undefined,
+        data,
+        criadoEm,
+      }
     }
     if (editingId) {
       atualizarVenda(venda)
@@ -79,6 +169,12 @@ export default function Vendas() {
     load()
   }
 
+  const remove = (id: string) => {
+    if (!confirm('Excluir esta venda?')) return
+    excluirVenda(id)
+    load()
+  }
+
   const formatMoney = (v: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 
@@ -88,11 +184,23 @@ export default function Vendas() {
   }, {} as Record<FormaPagamentoVenda, number>)
   const totalGeral = vendas.reduce((s, v) => s + v.valor, 0)
 
+  const labelForma = (f: FormaPagamentoVenda) =>
+    f === 'pix' ? 'PIX' : f === 'dinheiro' ? 'Dinheiro' : 'Cartão'
+
+  const labelFormaVenda = (v: Venda) => {
+    if (v.formaPagamento === 'cartao') {
+      if (v.tipoPagamentoCartao === 'debito') return 'Cartão Débito'
+      return `Cartão Crédito ${v.quantidadeParcelas ?? 1}x`
+    }
+    return labelForma(v.formaPagamento)
+  }
+
   return (
     <>
       <h1 className="page-title">Controle de Vendas</h1>
       <p style={{ color: 'var(--text-muted)', marginBottom: 20 }}>
-        Registre vendas com a forma de pagamento: <strong>PIX</strong>, <strong>Dinheiro</strong>, <strong>Débito</strong> ou <strong>Crédito</strong>. Vendas em PIX, débito e crédito podem ser vinculadas a uma conta banco para atualizar o saldo.
+        Registre vendas com a forma de pagamento: <strong>PIX</strong>, <strong>Dinheiro</strong> ou <strong>Cartão</strong>.
+        Vendas em PIX e cartão podem ser vinculadas a uma conta banco. Para cartão, o valor líquido (após taxa da operadora) é lançado no financeiro.
       </p>
       <div style={{ marginBottom: 20 }}>
         <button type="button" className="btn btn-primary" onClick={openNew}>
@@ -102,12 +210,12 @@ export default function Vendas() {
 
       <div className="grid-cards" style={{ marginBottom: 24 }}>
         <div className="card-saldo">
-          <h3>Total de vendas</h3>
+          <h3>Total de vendas (líquido)</h3>
           <div className="valor saldo-positivo">{formatMoney(totalGeral)}</div>
         </div>
         {FORMAS.map((forma) => (
           <div key={forma} className="card-saldo">
-            <h3>{forma === 'pix' ? 'PIX' : forma === 'dinheiro' ? 'Dinheiro' : forma === 'debito' ? 'Débito' : 'Crédito'}</h3>
+            <h3>{labelForma(forma)}</h3>
             <div className="valor">{formatMoney(totaisPorForma[forma])}</div>
           </div>
         ))}
@@ -121,7 +229,7 @@ export default function Vendas() {
               <th>Descrição</th>
               <th>Valor</th>
               <th>Forma de pagamento</th>
-              <th>Conta (PIX/Déb/Créd)</th>
+              <th>Conta (PIX/Cartão)</th>
               <th></th>
             </tr>
           </thead>
@@ -133,15 +241,13 @@ export default function Vendas() {
                 </td>
               </tr>
             )}
-            {[...vendas].sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()).map((v) => (
+            {[...vendas].sort((a, b) => parseDateOnly(b.data).getTime() - parseDateOnly(a.data).getTime()).map((v) => (
               <tr key={v.id}>
-                <td>{format(new Date(v.data), 'dd/MM/yyyy', { locale: ptBR })}</td>
+                <td>{formatDateBR(v.data)}</td>
                 <td>{v.descricao}</td>
                 <td>{formatMoney(v.valor)}</td>
                 <td>
-                  <span className="badge badge-info">
-                    {v.formaPagamento === 'pix' ? 'PIX' : v.formaPagamento === 'dinheiro' ? 'Dinheiro' : v.formaPagamento === 'debito' ? 'Débito' : 'Crédito'}
-                  </span>
+                  <span className="badge badge-info">{labelFormaVenda(v)}</span>
                 </td>
                 <td>
                   {v.contaBancoId
@@ -149,8 +255,11 @@ export default function Vendas() {
                     : '-'}
                 </td>
                 <td>
-                  <button type="button" className="btn btn-secondary" onClick={() => openEdit(v)}>
+                  <button type="button" className="btn btn-secondary" onClick={() => openEdit(v)} style={{ marginRight: 8 }}>
                     Editar
+                  </button>
+                  <button type="button" className="btn btn-danger" onClick={() => remove(v.id)}>
+                    Excluir
                   </button>
                 </td>
               </tr>
@@ -174,7 +283,7 @@ export default function Vendas() {
                 />
               </div>
               <div className="form-group">
-                <label>Valor (R$)</label>
+                <label>Valor bruto (R$)</label>
                 <input
                   required
                   value={form.valor}
@@ -191,16 +300,73 @@ export default function Vendas() {
                     setForm((f) => ({
                       ...f,
                       formaPagamento: e.target.value as FormaPagamentoVenda,
+                      maquinaCartaoId: e.target.value === 'cartao' ? f.maquinaCartaoId : '',
+                      modalidadeCartao: e.target.value === 'cartao' ? f.modalidadeCartao : '',
                       contaBancoId: e.target.value === 'dinheiro' ? '' : f.contaBancoId,
                     }))
                   }
                 >
                   <option value="pix">PIX</option>
                   <option value="dinheiro">Dinheiro</option>
-                  <option value="debito">Débito</option>
-                  <option value="credito">Crédito</option>
+                  <option value="cartao">Cartão</option>
                 </select>
               </div>
+              {form.formaPagamento === 'cartao' && (
+                <>
+                  <div className="form-group">
+                    <label>Máquina de cartão</label>
+                    <select
+                      value={form.maquinaCartaoId}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          maquinaCartaoId: e.target.value,
+                          modalidadeCartao: '',
+                        }))
+                      }
+                      required
+                    >
+                      <option value="">Selecione</option>
+                      {maquinas.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Tipo de cartão</label>
+                    <select
+                      value={form.modalidadeCartao}
+                      onChange={(e) => setForm((f) => ({ ...f, modalidadeCartao: e.target.value }))}
+                      required
+                    >
+                      <option value="">Selecione</option>
+                      {MODALIDADES_CARTAO.map((m) => (
+                        <option key={m.value} value={m.value}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {calculoCartao && taxaConfigurada && (
+                    <div className="card" style={{ marginBottom: 16, padding: 12, background: 'var(--bg-secondary)' }}>
+                      <h4 style={{ marginBottom: 8, fontSize: '0.9rem' }}>Resumo</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.9rem' }}>
+                        <span>Valor bruto: {formatMoney(valorBruto)}</span>
+                        <span>Taxa: {taxaConfigurada.taxaPercentual.toFixed(2)}%</span>
+                        <span>Valor da taxa: {formatMoney(calculoCartao.valorTaxa)}</span>
+                        <span style={{ fontWeight: 600 }}>Valor líquido a receber: {formatMoney(calculoCartao.valorLiquido)}</span>
+                      </div>
+                    </div>
+                  )}
+                  {form.maquinaCartaoId && form.modalidadeCartao && !taxaConfigurada && valorBruto > 0 && (
+                    <p style={{ color: 'var(--warning)', fontSize: '0.9rem', marginBottom: 12 }}>
+                      Não existe taxa cadastrada para esta máquina de cartão nesta modalidade. Configure em Configurações → Máquinas de Cartão.
+                    </p>
+                  )}
+                </>
+              )}
               {exigeContaBanco && (
                 <div className="form-group">
                   <label>Conta banco que recebeu (atualiza o saldo)</label>
@@ -227,7 +393,14 @@ export default function Vendas() {
                 <button type="button" className="btn btn-secondary" onClick={() => { setModalOpen(false); setEditingId(null); setForm(emptyForm) }}>
                   Cancelar
                 </button>
-                <button type="submit" className="btn btn-primary">
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={
+                  form.formaPagamento === 'cartao' &&
+                  (!form.maquinaCartaoId || !modalidadeSelecionada || !taxaConfigurada)
+                }
+                >
                   {editingId ? 'Salvar' : 'Registrar venda'}
                 </button>
               </div>

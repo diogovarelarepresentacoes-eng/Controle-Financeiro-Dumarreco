@@ -33,6 +33,20 @@ services:
       db:
         condition: service_healthy
 
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3333}
+        VITE_CRM_API_URL: ${VITE_CRM_API_URL:-http://localhost:4000}
+    container_name: dumarreco_web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-5173}:80"
+
 volumes:
   postgres_data:
     name: dumarreco_postgres_data

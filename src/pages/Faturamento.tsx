@@ -75,7 +75,7 @@ function buildLinhasAno(
     })
     const faturamento = vendasNoMes.reduce((s, v) => s + v.valor, 0)
     const vendaCartao = vendasNoMes
-      .filter((v) => v.formaPagamento === 'debito' || v.formaPagamento === 'credito')
+      .filter((v) => v.formaPagamento === 'cartao')
       .reduce((s, v) => s + v.valor, 0)
     const boletosPagosNoMes = boletos
       .filter((b) => b.pago && b.dataPagamento)

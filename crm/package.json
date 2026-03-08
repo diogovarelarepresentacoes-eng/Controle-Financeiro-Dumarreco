@@ -1,0 +1,19 @@
+{
+  "name": "dumarreco-crm-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace @crm/api",
+    "dev:web": "npm run dev --workspace @crm/web",
+    "build:api": "npm run build --workspace @crm/api",
+    "build:web": "npm run build --workspace @crm/web",
+    "test:api": "npm run test --workspace @crm/api",
+    "db:migrate:deploy": "npm run prisma:migrate:deploy --workspace @crm/api",
+    "db:migrate:status": "npm run prisma:migrate:status --workspace @crm/api",
+    "db:backup": "docker compose --profile backup run --rm db-backup"
+  }
+}

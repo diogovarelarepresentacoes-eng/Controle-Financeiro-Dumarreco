@@ -1,7 +1,9 @@
 import { comprasController } from '../modules/compras/controller'
 import type { CompraComRelacionamentos, FiltrosCompra, KpisCompras } from '../modules/compras/model'
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
+const API_BASE_RAW = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
+const API_BASE = API_BASE_RAW || 'http://localhost:3333'
+const USING_BACKEND = Boolean(API_BASE_RAW)
 
 function toNumber(v: unknown): number {
   if (typeof v === 'number') return v
@@ -94,7 +96,7 @@ function computeKpis(mesCompetencia: string, lista: CompraComRelacionamentos[]):
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  if (!API_BASE) throw new Error('API de compras nao configurada.')
+  if (!USING_BACKEND) throw new Error('API backend nao configurada (VITE_API_BASE_URL).')
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
@@ -111,9 +113,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const purchasesGateway = {
-  usingBackend: Boolean(API_BASE),
+  usingBackend: USING_BACKEND,
   async list(filtros: FiltrosCompra): Promise<CompraComRelacionamentos[]> {
-    if (!API_BASE) return comprasController.listar(filtros)
+    if (!USING_BACKEND) return comprasController.listar(filtros)
     const params = new URLSearchParams()
     if (filtros.mesCompetencia) params.set('competenceMonth', filtros.mesCompetencia)
     if (filtros.fornecedor) params.set('supplier', filtros.fornecedor)
@@ -130,12 +132,12 @@ export const purchasesGateway = {
     return rows.map(normalizeCompraApi)
   },
   async detail(id: string): Promise<CompraComRelacionamentos | undefined> {
-    if (!API_BASE) return comprasController.detalhar(id)
+    if (!USING_BACKEND) return comprasController.detalhar(id)
     const row = await request<any>(`/api/purchases/${id}`)
     return normalizeCompraApi(row)
   },
   async createManual(payload: Parameters<typeof comprasController.criarManual>[0]) {
-    if (!API_BASE) return comprasController.criarManual(payload)
+    if (!USING_BACKEND) return comprasController.criarManual(payload)
     return request('/api/purchases/manual', {
       method: 'POST',
       body: JSON.stringify({
@@ -157,14 +159,14 @@ export const purchasesGateway = {
     })
   },
   async importXml(xmlRaw: string, performedBy: string) {
-    if (!API_BASE) return comprasController.importarXml(xmlRaw, performedBy)
+    if (!USING_BACKEND) return comprasController.importarXml(xmlRaw, performedBy)
     return request('/api/purchases/import-xml', {
       method: 'POST',
       body: JSON.stringify({ xmlRaw, performedBy }),
     })
   },
   async generatePayables(payload: Parameters<typeof comprasController.gerarContasPagarManual>[0]) {
-    if (!API_BASE) return comprasController.gerarContasPagarManual(payload)
+    if (!USING_BACKEND) return comprasController.gerarContasPagarManual(payload)
     return request(`/api/purchases/${payload.compraId}/generate-payables`, {
       method: 'POST',
       body: JSON.stringify({
@@ -176,11 +178,11 @@ export const purchasesGateway = {
     })
   },
   async remove(id: string) {
-    if (!API_BASE) return comprasController.excluirCompra(id)
+    if (!USING_BACKEND) return comprasController.excluirCompra(id)
     return request(`/api/purchases/${id}`, { method: 'DELETE' })
   },
   async kpis(mesCompetencia: string, listaAtual?: CompraComRelacionamentos[]) {
-    if (!API_BASE) return comprasController.kpisMensais(mesCompetencia)
+    if (!USING_BACKEND) return comprasController.kpisMensais(mesCompetencia)
     const lista = listaAtual ?? (await this.list({ mesCompetencia, tipoNota: 'todas', statusPagamento: 'todos' }))
     return computeKpis(mesCompetencia, lista)
   },

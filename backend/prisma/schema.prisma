@@ -92,3 +92,104 @@ model XmlImportLog {
   nfeAccessKey String?
   purchaseId   String?
 }
+
+enum ProductImportJobType {
+  PRODUCT_IMPORT
+  STOCK_UPDATE
+}
+
+enum ProductImportJobStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+}
+
+enum InventoryMovementType {
+  IMPORT_SET
+  IMPORT_ADD
+  MANUAL_ADJUST
+}
+
+model Product {
+  id               String              @id @default(uuid())
+  code             String              @unique
+  description      String
+  priceInstallment Decimal             @db.Decimal(12, 2)
+  stockBalance     Decimal             @db.Decimal(12, 3)
+  unit             String?
+  isActive         Boolean             @default(true)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  movements        InventoryMovement[]
+
+  @@index([code])
+}
+
+model ProductImportJob {
+  id         String               @id @default(uuid())
+  type       ProductImportJobType
+  fileName   String
+  status     ProductImportJobStatus @default(PENDING)
+  optionsJson Json
+  totalsJson  Json?
+  createdBy   String?
+  createdAt   DateTime            @default(now())
+  finishedAt  DateTime?
+  errors      ProductImportError[]
+  movements   InventoryMovement[]
+}
+
+model ProductImportError {
+  id           String           @id @default(uuid())
+  jobId        String
+  rowNumber    Int
+  productCode  String?
+  errorMessage String
+  rawRowJson   Json?
+  job          ProductImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, rowNumber])
+}
+
+model InventoryMovement {
+  id              String               @id @default(uuid())
+  productId       String
+  movementType    InventoryMovementType
+  quantity        Decimal              @db.Decimal(12, 3)
+  previousBalance Decimal              @db.Decimal(12, 3)
+  newBalance      Decimal              @db.Decimal(12, 3)
+  referenceJobId  String?
+  createdBy       String?
+  createdAt       DateTime             @default(now())
+  product         Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  referenceJob    ProductImportJob?    @relation(fields: [referenceJobId], references: [id], onDelete: SetNull)
+}
+
+model MaquinaCartao {
+  id          String              @id @default(uuid())
+  nome        String
+  adquirente  String
+  descricao   String?
+  ativo       Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  taxas       TaxaMaquinaCartao[]
+
+  @@index([ativo])
+}
+
+model TaxaMaquinaCartao {
+  id               String        @id @default(uuid())
+  maquinaCartaoId  String
+  maquinaCartao    MaquinaCartao @relation(fields: [maquinaCartaoId], references: [id], onDelete: Cascade)
+  tipoCartao       String
+  parcelas         Int
+  taxaPercentual   Decimal       @db.Decimal(5, 2)
+  ativo            Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@unique([maquinaCartaoId, tipoCartao, parcelas])
+  @@index([maquinaCartaoId, tipoCartao, parcelas])
+}

@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { Boleto, OrigemPagamento } from '../types'
 import { storageBoletos, storageContas, registrarBaixaBoleto, getSaldoDinheiro } from '../services/storage'
-import { format } from 'date-fns'
-import ptBR from 'date-fns/locale/pt-BR'
+import { formatDateBR } from '../utils/date'
 
 export default function BaixaBoleto() {
   const [pendentes, setPendentes] = useState<Boleto[]>([])
@@ -84,7 +83,7 @@ export default function BaixaBoleto() {
                   </td>
                   <td>{b.descricao}</td>
                   <td>{formatMoney(b.valor)}</td>
-                  <td>{b.vencimento ? format(new Date(b.vencimento), 'dd/MM/yyyy', { locale: ptBR }) : '-'}</td>
+                  <td>{formatDateBR(b.vencimento)}</td>
                 </tr>
               ))}
             </tbody>

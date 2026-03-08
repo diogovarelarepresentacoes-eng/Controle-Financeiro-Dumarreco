@@ -38,8 +38,7 @@ export default function RelatorioVendas() {
     const formas = [
       { key: 'pix', label: 'PIX' },
       { key: 'dinheiro', label: 'Dinheiro' },
-      { key: 'debito', label: 'Debito' },
-      { key: 'credito', label: 'Credito' },
+      { key: 'cartao', label: 'Cartao (liquido)' },
     ] as const
 
     return formas.map((forma) => {
@@ -58,6 +57,24 @@ export default function RelatorioVendas() {
       }
     })
   }, [vendas, referenciaAnterior, referenciaAtual])
+
+  const totalBruto = vendasFiltradas.reduce((s, v) => s + (v.valorBruto ?? v.valor), 0)
+  const totalTaxas = vendasFiltradas.reduce((s, v) => s + (v.valorTaxaCartao ?? 0), 0)
+
+  const detalhamentoPorMaquina = useMemo(() => {
+    const vendasCartao = vendasFiltradas.filter((v) => v.formaPagamento === 'cartao')
+    const map = new Map<string, { nome: string; bruto: number; taxas: number; liquido: number }>()
+    for (const v of vendasCartao) {
+      const key = v.maquinaCartaoId ?? '__sem_maquina__'
+      const nome = v.maquinaCartaoNome ?? 'Não informada'
+      const cur = map.get(key) ?? { nome, bruto: 0, taxas: 0, liquido: 0 }
+      cur.bruto += v.valorBruto ?? v.valor
+      cur.taxas += v.valorTaxaCartao ?? 0
+      cur.liquido += v.valor
+      map.set(key, cur)
+    }
+    return Array.from(map.values())
+  }, [vendasFiltradas])
 
   const imprimir = () => {
     window.print()
@@ -143,15 +160,18 @@ export default function RelatorioVendas() {
               <tr>
                 <th>Data</th>
                 <th>Descricao</th>
-                <th>Valor</th>
+                <th>Valor bruto</th>
+                <th>Taxa</th>
+                <th>Valor liquido</th>
                 <th>Forma de pagamento</th>
-                <th>Conta (PIX/Deb/Cred)</th>
+                <th>Maquina (Cartao)</th>
+                <th>Conta (PIX/Cartao)</th>
               </tr>
             </thead>
             <tbody>
               {vendasFiltradas.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
+                  <td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
                     Nenhuma venda no periodo.
                   </td>
                 </tr>
@@ -160,10 +180,13 @@ export default function RelatorioVendas() {
                   <tr key={v.id}>
                     <td>{format(parseISO(v.data), 'dd/MM/yyyy', { locale: ptBR })}</td>
                     <td>{v.descricao}</td>
+                    <td>{formatMoney(v.valorBruto ?? v.valor)}</td>
+                    <td>{v.valorTaxaCartao != null ? formatMoney(v.valorTaxaCartao) : '-'}</td>
                     <td>{formatMoney(v.valor)}</td>
                     <td>
-                      {v.formaPagamento === 'pix' ? 'PIX' : v.formaPagamento === 'dinheiro' ? 'Dinheiro' : v.formaPagamento === 'debito' ? 'Debito' : 'Credito'}
+                      {v.formaPagamento === 'pix' ? 'PIX' : v.formaPagamento === 'dinheiro' ? 'Dinheiro' : v.tipoPagamentoCartao === 'debito' ? 'Cartao Debito' : `Cartao Credito ${v.quantidadeParcelas ?? 1}x`}
                     </td>
+                    <td>{v.formaPagamento === 'cartao' ? (v.maquinaCartaoNome ?? '-') : '-'}</td>
                     <td>{v.contaBancoId ? nomeConta(v.contaBancoId) : '-'}</td>
                   </tr>
                 ))
@@ -172,9 +195,37 @@ export default function RelatorioVendas() {
           </table>
         </div>
 
-        <p className="relatorio-total">
-          <strong>Total de vendas no periodo: {formatMoney(totalVendas)}</strong>
-        </p>
+        {detalhamentoPorMaquina.length > 0 && (
+          <div className="table-wrap" style={{ marginTop: 24, marginBottom: 16 }}>
+            <h3 style={{ marginBottom: 12, fontSize: '1rem' }}>Detalhamento por maquina de cartao</h3>
+            <table className="relatorio-tabela">
+              <thead>
+                <tr>
+                  <th>Maquina</th>
+                  <th>Total bruto</th>
+                  <th>Total taxas</th>
+                  <th>Total liquido</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detalhamentoPorMaquina.map((d) => (
+                  <tr key={d.nome}>
+                    <td>{d.nome}</td>
+                    <td>{formatMoney(d.bruto)}</td>
+                    <td>{formatMoney(d.taxas)}</td>
+                    <td>{formatMoney(d.liquido)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="relatorio-total" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <strong>Total bruto: {formatMoney(totalBruto)}</strong>
+          <strong>Total taxas: {formatMoney(totalTaxas)}</strong>
+          <strong>Total liquido no periodo: {formatMoney(totalVendas)}</strong>
+        </div>
       </section>
 
       <p className="relatorio-rodape" style={{ marginTop: 24, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
