@@ -6,10 +6,12 @@ import { ThemeToggle } from '../ui/ThemeToggle'
 import { ROTA_DESPESAS } from '../../modules/despesas/routes'
 import { ROTA_COMPRAS } from '../../modules/compras/routes'
 import { ROTA_CRM_ATENDIMENTO, ROTA_CRM_CONFIG, ROTA_CRM_INBOX, ROTA_CRM_KANBAN, ROTA_CRM_METAS } from '../../modules/crm/routes'
+import { useAuth } from '../../context/AuthContext'
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { logout, usuarioAtual } = useAuth()
 
   const financeiroAtivo = location.pathname === '/boletos' || location.pathname === '/baixa-boleto'
   const relatoriosAtivo = location.pathname.startsWith('/relatorios')
@@ -139,6 +141,22 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <NavLink to="/configuracoes/maquinas-cartao" onClick={() => setMobileMenuOpen(false)}>Maquinas de Cartao</NavLink>
           </div>
         )}
+      </div>
+
+      <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {usuarioAtual && (
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '0 4px' }}>
+            {usuarioAtual}
+          </span>
+        )}
+        <button
+          type="button"
+          className="btn btn-danger"
+          style={{ width: '100%' }}
+          onClick={() => { setMobileMenuOpen(false); logout() }}
+        >
+          Sair
+        </button>
       </div>
     </nav>
   )
