@@ -15,7 +15,7 @@ export type CategoriaDespesa =
 
 export type TipoDespesa = 'fixa' | 'variavel'
 export type StatusDespesa = 'pendente' | 'pago' | 'atrasado'
-export type FormaPagamentoDespesa = 'pix' | 'boleto' | 'transferencia' | 'cartao' | 'dinheiro'
+export type FormaPagamentoDespesa = 'pix' | 'boleto' | 'transferencia' | 'cartao' | 'dinheiro' | 'outros'
 export type PeriodicidadeDespesa = 'mensal' | 'semanal' | 'anual'
 
 export interface Despesa {
@@ -28,6 +28,8 @@ export interface Despesa {
   dataPagamento?: string
   status: StatusDespesa
   formaPagamento: FormaPagamentoDespesa
+  origemPagamento?: 'dinheiro' | 'conta_banco'
+  contaBancoId?: string
   fornecedor: string
   centroCusto: string
   observacoes: string
@@ -84,4 +86,5 @@ export const FORMAS_PAGAMENTO_DESPESA: FormaPagamentoDespesa[] = [
   'transferencia',
   'cartao',
   'dinheiro',
+  'outros',
 ]

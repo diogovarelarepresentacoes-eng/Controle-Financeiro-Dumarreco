@@ -2,6 +2,7 @@ import { addMonths, addWeeks, addYears, endOfMonth, format, parseISO, startOfMon
 import { despesasRepository } from './repository'
 import type { DashboardDespesas, Despesa, FiltrosDespesas, PeriodicidadeDespesa, StatusDespesa } from './model'
 import { CATEGORIAS_DESPESA } from './model'
+import { registrarPagamentoDespesa, reverterPagamentoDespesa } from '../../services/storage'
 
 type CriarDespesaInput = Omit<Despesa, 'id' | 'criadoEm' | 'atualizadoEm' | 'recorrenciaOrigemId'>
 type AtualizarDespesaInput = Partial<CriarDespesaInput>
@@ -125,12 +126,18 @@ export const despesasService = {
     }
     const withOrigem = { ...item, recorrenciaOrigemId: item.recorrente ? item.id : undefined }
     despesasRepository.save(withOrigem)
+    if (withOrigem.status === 'pago' && withOrigem.origemPagamento) {
+      registrarPagamentoDespesa(withOrigem)
+    }
     return withOrigem
   },
 
   update: (id: string, input: AtualizarDespesaInput): Despesa => {
     const existente = despesasRepository.getById(id)
     if (!existente) throw new Error('Despesa nao encontrada')
+    if (existente.status === 'pago' && existente.origemPagamento) {
+      reverterPagamentoDespesa(existente)
+    }
     const merged: Despesa = {
       ...existente,
       ...input,
@@ -139,6 +146,9 @@ export const despesasService = {
       atualizadoEm: new Date().toISOString(),
     }
     despesasRepository.save(merged)
+    if (merged.status === 'pago' && merged.origemPagamento) {
+      registrarPagamentoDespesa(merged)
+    }
     return merged
   },
 
@@ -151,10 +161,18 @@ export const despesasService = {
     // Se for mestre recorrente, remove todo o grupo e limpa marcadores.
     if (existente.recorrente && (existente.recorrenciaOrigemId === existente.id || existente.recorrenciaOrigemId === undefined)) {
       const todos = despesasRepository.getAll()
+      const grupo = todos.filter((d) => (d.recorrenciaOrigemId ?? d.id) === origemId)
+      for (const d of grupo) {
+        if (d.status === 'pago' && d.origemPagamento) reverterPagamentoDespesa(d)
+      }
       const restante = todos.filter((d) => (d.recorrenciaOrigemId ?? d.id) !== origemId)
       despesasRepository.saveAll(restante)
       despesasRepository.clearDeletedRecurrenceMarkersByOrigem(origemId)
       return
+    }
+
+    if (existente.status === 'pago' && existente.origemPagamento) {
+      reverterPagamentoDespesa(existente)
     }
 
     // Se for uma ocorrência recorrente, marca como excluída para não ser recriada.

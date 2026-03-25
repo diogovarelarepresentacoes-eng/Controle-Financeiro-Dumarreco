@@ -1,4 +1,5 @@
 import type { ContaBanco, Boleto, MovimentacaoBancaria, Venda, FaturamentoMensal } from '../types';
+import type { Despesa } from '../modules/despesas/model';
 
 const KEY_CONTAS = 'controle-financeiro-contas';
 const KEY_BOLETOS = 'controle-financeiro-boletos';
@@ -187,15 +188,28 @@ export const storageMovimentacoes = {
   },
 };
 
-/** Saldo em dinheiro: vendas em dinheiro menos boletos pagos em dinheiro */
+function getDespesasPagasDinheiro(): number {
+  try {
+    const data = localStorage.getItem(KEY_DESPESAS);
+    const list: Despesa[] = data ? JSON.parse(data) : [];
+    return list
+      .filter((d) => d.status === 'pago' && d.origemPagamento === 'dinheiro')
+      .reduce((s, d) => s + d.valor, 0);
+  } catch {
+    return 0;
+  }
+}
+
+/** Saldo em dinheiro: vendas em dinheiro menos boletos pagos em dinheiro e despesas pagas em dinheiro */
 export function getSaldoDinheiro(): number {
   const entradas = getVendas()
     .filter((v) => v.formaPagamento === 'dinheiro')
     .reduce((s, v) => s + v.valor, 0);
-  const saidas = getBoletos()
+  const saidasBoletos = getBoletos()
     .filter((b) => b.pago && b.origemPagamento === 'dinheiro')
     .reduce((s, b) => s + b.valor, 0);
-  return entradas - saidas;
+  const saidasDespesas = getDespesasPagasDinheiro();
+  return entradas - saidasBoletos - saidasDespesas;
 }
 
 export const storageVendas = {
@@ -328,4 +342,29 @@ export function excluirVenda(vendaId: string): void {
     reverterMovimentacaoVenda(existente.id);
   }
   storageVendas.delete(existente.id);
+}
+
+/** Registra o pagamento de uma despesa na conta banco (saída). Para dinheiro, o saldo já é recalculado via getSaldoDinheiro(). */
+export function registrarPagamentoDespesa(despesa: Despesa): void {
+  if (despesa.origemPagamento !== 'conta_banco' || !despesa.contaBancoId) return;
+  storageMovimentacoes.add({
+    id: crypto.randomUUID(),
+    contaBancoId: despesa.contaBancoId,
+    tipo: 'saida',
+    valor: despesa.valor,
+    descricao: `Despesa: ${despesa.descricao}`,
+    despesaId: despesa.id,
+    data: despesa.dataPagamento ?? new Date().toISOString().slice(0, 10),
+  });
+  atualizarSaldoConta(despesa.contaBancoId, despesa.valor, 'saida');
+}
+
+/** Reverte o pagamento de uma despesa registrada na conta banco. Para dinheiro, o saldo já é recalculado via getSaldoDinheiro(). */
+export function reverterPagamentoDespesa(despesa: Despesa): void {
+  if (despesa.origemPagamento !== 'conta_banco' || !despesa.contaBancoId) return;
+  const movs = getMovimentacoes().filter((m) => m.despesaId === despesa.id);
+  for (const m of movs) {
+    atualizarSaldoConta(m.contaBancoId, m.valor, 'entrada');
+    storageMovimentacoes.delete(m.id);
+  }
 }

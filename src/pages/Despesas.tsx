@@ -14,6 +14,8 @@ import {
 } from '../modules/despesas/model'
 import { applyCurrencyMask, formatCurrencyForInput, parseCurrencyFromInput } from '../utils/currencyMask'
 import { formatDateBR } from '../utils/date'
+import { storageContas } from '../services/storage'
+import type { ContaBanco } from '../types'
 
 const STATUS_OPTIONS: Array<{ value: StatusDespesa; label: string }> = [
   { value: 'pendente', label: 'Pendente' },
@@ -36,12 +38,20 @@ const formInicial = {
   dataVencimento: new Date().toISOString().slice(0, 10),
   dataPagamento: '',
   status: 'pendente' as StatusDespesa,
-  formaPagamento: 'boleto' as Despesa['formaPagamento'],
+  formaPagamento: 'outros' as Despesa['formaPagamento'],
+  origemPagamento: '' as '' | 'dinheiro' | 'conta_banco',
+  contaBancoId: '',
   fornecedor: '',
   centroCusto: '',
   observacoes: '',
   recorrente: false,
   periodicidade: 'mensal' as PeriodicidadeDespesa,
+}
+
+const pagarFormInicial = {
+  dataPagamento: new Date().toISOString().slice(0, 10),
+  origemPagamento: '' as '' | 'dinheiro' | 'conta_banco',
+  contaBancoId: '',
 }
 
 function monthRange() {
@@ -55,6 +65,7 @@ function monthRange() {
 
 export default function Despesas() {
   const [despesas, setDespesas] = useState<Despesa[]>([])
+  const [contas, setContas] = useState<ContaBanco[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(formInicial)
@@ -63,6 +74,9 @@ export default function Despesas() {
   const [filtroCategoria, setFiltroCategoria] = useState<'todas' | CategoriaDespesa>('todas')
   const [filtroStatus, setFiltroStatus] = useState<'todos' | StatusDespesa>('todos')
   const [filtroBusca, setFiltroBusca] = useState('')
+
+  const [pagarModalDespesa, setPagarModalDespesa] = useState<Despesa | null>(null)
+  const [pagarForm, setPagarForm] = useState(pagarFormInicial)
 
   const competencia = despesasController.competenciaAtual()
   const [mesDashboard, setMesDashboard] = useState(String(competencia.mes).padStart(2, '0'))
@@ -77,6 +91,7 @@ export default function Despesas() {
       busca: filtroBusca,
     })
     setDespesas(list)
+    setContas(storageContas.getAll().filter((c) => c.ativo))
   }
 
   useEffect(() => {
@@ -109,6 +124,8 @@ export default function Despesas() {
       dataPagamento: d.dataPagamento ?? '',
       status: d.status,
       formaPagamento: d.formaPagamento,
+      origemPagamento: d.origemPagamento ?? '',
+      contaBancoId: d.contaBancoId ?? '',
       fornecedor: d.fornecedor,
       centroCusto: d.centroCusto,
       observacoes: d.observacoes,
@@ -127,30 +144,33 @@ export default function Despesas() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     const valor = parseCurrencyFromInput(form.valor)
-    if (
-      !form.descricao.trim() ||
-      !form.categoria ||
-      !form.tipo ||
-      valor <= 0 ||
-      !form.dataVencimento ||
-      !form.status ||
-      !form.formaPagamento ||
-      !form.fornecedor.trim() ||
-      !form.centroCusto.trim() ||
-      !form.observacoes.trim()
-    ) {
+
+    if (!form.descricao.trim() || !form.categoria || !form.tipo || valor <= 0 || !form.dataVencimento || !form.status) {
       alert('Preencha todos os campos obrigatorios.')
       return
     }
-    if (form.status === 'pago' && !form.dataPagamento) {
-      alert('Para status pago, informe a data de pagamento.')
-      return
+
+    if (editingId) {
+      if (form.status === 'pago' && !form.dataPagamento) {
+        alert('Para status pago, informe a data de pagamento.')
+        return
+      }
+      if (form.status === 'pago' && !form.origemPagamento) {
+        alert('Para status pago, informe a origem do pagamento (Dinheiro ou Conta banco).')
+        return
+      }
+      if (form.status === 'pago' && form.origemPagamento === 'conta_banco' && !form.contaBancoId) {
+        alert('Selecione a conta banco utilizada no pagamento.')
+        return
+      }
     }
+
     if (form.recorrente && !form.periodicidade) {
       alert('Selecione a periodicidade da despesa recorrente.')
       return
     }
 
+    const origemPagamento = form.status === 'pago' && form.origemPagamento ? form.origemPagamento : undefined
     const payload = {
       descricao: form.descricao.trim(),
       categoria: form.categoria,
@@ -159,10 +179,12 @@ export default function Despesas() {
       dataVencimento: form.dataVencimento,
       dataPagamento: form.dataPagamento || undefined,
       status: form.status,
-      formaPagamento: form.formaPagamento,
-      fornecedor: form.fornecedor.trim(),
-      centroCusto: form.centroCusto.trim(),
-      observacoes: form.observacoes.trim(),
+      formaPagamento: editingId ? form.formaPagamento : ('outros' as const),
+      origemPagamento,
+      contaBancoId: origemPagamento === 'conta_banco' ? form.contaBancoId : undefined,
+      fornecedor: editingId ? form.fornecedor.trim() : '',
+      centroCusto: editingId ? form.centroCusto.trim() : '',
+      observacoes: editingId ? form.observacoes.trim() : '',
       recorrente: form.recorrente,
       periodicidade: form.recorrente ? form.periodicidade : undefined,
     }
@@ -174,6 +196,45 @@ export default function Despesas() {
       load()
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Erro ao salvar despesa.')
+    }
+  }
+
+  const openPagar = (d: Despesa) => {
+    setPagarModalDespesa(d)
+    setPagarForm(pagarFormInicial)
+  }
+
+  const closePagar = () => {
+    setPagarModalDespesa(null)
+    setPagarForm(pagarFormInicial)
+  }
+
+  const submitPagar = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!pagarModalDespesa) return
+    if (!pagarForm.dataPagamento) {
+      alert('Informe a data de pagamento.')
+      return
+    }
+    if (!pagarForm.origemPagamento) {
+      alert('Informe a origem do pagamento.')
+      return
+    }
+    if (pagarForm.origemPagamento === 'conta_banco' && !pagarForm.contaBancoId) {
+      alert('Selecione a conta banco.')
+      return
+    }
+    try {
+      despesasController.atualizar(pagarModalDespesa.id, {
+        status: 'pago',
+        dataPagamento: pagarForm.dataPagamento,
+        origemPagamento: pagarForm.origemPagamento,
+        contaBancoId: pagarForm.origemPagamento === 'conta_banco' ? pagarForm.contaBancoId : undefined,
+      })
+      closePagar()
+      load()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erro ao registrar pagamento.')
     }
   }
 
@@ -388,6 +449,11 @@ export default function Despesas() {
                     <td>{d.fornecedor}</td>
                     <td>{d.centroCusto}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
+                      {d.status !== 'pago' && (
+                        <button type="button" className="btn btn-success" onClick={() => openPagar(d)} style={{ marginRight: 8 }}>
+                          Pagar
+                        </button>
+                      )}
                       <button type="button" className="btn btn-secondary" onClick={() => openEdit(d)} style={{ marginRight: 8 }}>
                         Editar
                       </button>
@@ -403,6 +469,7 @@ export default function Despesas() {
         </div>
       </div>
 
+      {/* Modal Nova / Editar Despesa */}
       {modalOpen && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal" style={{ maxWidth: 760 }} onClick={(e) => e.stopPropagation()}>
@@ -451,40 +518,75 @@ export default function Despesas() {
                     ))}
                   </select>
                 </div>
-                <div className="form-group">
-                  <label>Data de pagamento</label>
-                  <input type="date" value={form.dataPagamento} onChange={(e) => setForm((f) => ({ ...f, dataPagamento: e.target.value }))} />
-                </div>
-                <div className="form-group">
-                  <label>Forma de pagamento</label>
-                  <select
-                    required
-                    value={form.formaPagamento}
-                    onChange={(e) => setForm((f) => ({ ...f, formaPagamento: e.target.value as Despesa['formaPagamento'] }))}
-                  >
-                    {FORMAS_PAGAMENTO_DESPESA.map((fp) => (
-                      <option key={fp} value={fp}>{fp}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Fornecedor</label>
-                  <input required value={form.fornecedor} onChange={(e) => setForm((f) => ({ ...f, fornecedor: e.target.value }))} />
-                </div>
-                <div className="form-group">
-                  <label>Centro de custo</label>
-                  <input required value={form.centroCusto} onChange={(e) => setForm((f) => ({ ...f, centroCusto: e.target.value }))} />
-                </div>
+
+                {/* Campos extras apenas na edicao */}
+                {editingId && (
+                  <>
+                    <div className="form-group">
+                      <label>Data de pagamento</label>
+                      <input type="date" value={form.dataPagamento} onChange={(e) => setForm((f) => ({ ...f, dataPagamento: e.target.value }))} />
+                    </div>
+                    {form.status === 'pago' && (
+                      <div className="form-group">
+                        <label>Origem do pagamento</label>
+                        <select
+                          value={form.origemPagamento}
+                          onChange={(e) => setForm((f) => ({ ...f, origemPagamento: e.target.value as '' | 'dinheiro' | 'conta_banco', contaBancoId: '' }))}
+                        >
+                          <option value="">Selecione...</option>
+                          <option value="dinheiro">Dinheiro (caixa)</option>
+                          <option value="conta_banco">Conta banco</option>
+                        </select>
+                      </div>
+                    )}
+                    {form.status === 'pago' && form.origemPagamento === 'conta_banco' && (
+                      <div className="form-group">
+                        <label>Conta banco</label>
+                        <select
+                          value={form.contaBancoId}
+                          onChange={(e) => setForm((f) => ({ ...f, contaBancoId: e.target.value }))}
+                        >
+                          <option value="">Selecione...</option>
+                          {contas.map((c) => (
+                            <option key={c.id} value={c.id}>{c.nome} — {c.banco}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div className="form-group">
+                      <label>Forma de pagamento</label>
+                      <select
+                        value={form.formaPagamento}
+                        onChange={(e) => setForm((f) => ({ ...f, formaPagamento: e.target.value as Despesa['formaPagamento'] }))}
+                      >
+                        {FORMAS_PAGAMENTO_DESPESA.map((fp) => (
+                          <option key={fp} value={fp}>{fp}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Fornecedor</label>
+                      <input value={form.fornecedor} onChange={(e) => setForm((f) => ({ ...f, fornecedor: e.target.value }))} />
+                    </div>
+                    <div className="form-group">
+                      <label>Centro de custo</label>
+                      <input value={form.centroCusto} onChange={(e) => setForm((f) => ({ ...f, centroCusto: e.target.value }))} />
+                    </div>
+                  </>
+                )}
               </div>
-              <div className="form-group">
-                <label>Observacoes</label>
-                <textarea
-                  required
-                  rows={3}
-                  value={form.observacoes}
-                  onChange={(e) => setForm((f) => ({ ...f, observacoes: e.target.value }))}
-                />
-              </div>
+
+              {editingId && (
+                <div className="form-group">
+                  <label>Observacoes</label>
+                  <textarea
+                    rows={3}
+                    value={form.observacoes}
+                    onChange={(e) => setForm((f) => ({ ...f, observacoes: e.target.value }))}
+                  />
+                </div>
+              )}
+
               <div className="form-row">
                 <div className="form-group">
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -510,6 +612,62 @@ export default function Despesas() {
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={closeModal}>Cancelar</button>
                 <button type="submit" className="btn btn-primary">{editingId ? 'Salvar' : 'Cadastrar'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Mini-modal Pagar Despesa */}
+      {pagarModalDespesa && (
+        <div className="modal-overlay" onClick={closePagar}>
+          <div className="modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+            <h2>Pagar despesa</h2>
+            <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>
+              <strong>{pagarModalDespesa.descricao}</strong> — {formatMoney(pagarModalDespesa.valor)}
+            </p>
+            <form onSubmit={submitPagar}>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Data de pagamento</label>
+                  <input
+                    required
+                    type="date"
+                    value={pagarForm.dataPagamento}
+                    onChange={(e) => setPagarForm((f) => ({ ...f, dataPagamento: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Origem do pagamento</label>
+                  <select
+                    required
+                    value={pagarForm.origemPagamento}
+                    onChange={(e) => setPagarForm((f) => ({ ...f, origemPagamento: e.target.value as '' | 'dinheiro' | 'conta_banco', contaBancoId: '' }))}
+                  >
+                    <option value="">Selecione...</option>
+                    <option value="dinheiro">Dinheiro (caixa)</option>
+                    <option value="conta_banco">Conta banco</option>
+                  </select>
+                </div>
+                {pagarForm.origemPagamento === 'conta_banco' && (
+                  <div className="form-group">
+                    <label>Conta banco</label>
+                    <select
+                      required
+                      value={pagarForm.contaBancoId}
+                      onChange={(e) => setPagarForm((f) => ({ ...f, contaBancoId: e.target.value }))}
+                    >
+                      <option value="">Selecione...</option>
+                      {contas.map((c) => (
+                        <option key={c.id} value={c.id}>{c.nome} — {c.banco}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={closePagar}>Cancelar</button>
+                <button type="submit" className="btn btn-success">Confirmar pagamento</button>
               </div>
             </form>
           </div>

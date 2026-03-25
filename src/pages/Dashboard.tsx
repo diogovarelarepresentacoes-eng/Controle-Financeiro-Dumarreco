@@ -25,6 +25,8 @@ import {
 import { storageContas, storageBoletos, storageVendas, getSaldoDinheiro } from '../services/storage'
 import type { Boleto } from '../types'
 import { StatCard } from '../components/ui/StatCard'
+import { despesasController } from '../modules/despesas/controller'
+import type { Despesa } from '../modules/despesas/model'
 
 type VendasPorData = {
   data: string
@@ -48,6 +50,9 @@ export default function Dashboard() {
   const [contas] = useState(() => storageContas.getAll())
   const [vendas] = useState(() => storageVendas.getAll())
   const [boletos] = useState(() => storageBoletos.getAll())
+  const [despesasPendentes] = useState<Despesa[]>(() =>
+    despesasController.listar({ status: 'pendente' })
+  )
   const [mesCalendario, setMesCalendario] = useState(() => new Date())
 
   const contasHabilitadas = contas.filter((c) => c.ativo)
@@ -120,6 +125,19 @@ export default function Dashboard() {
     })
     return map
   }, [boletos])
+
+  // Despesas pendentes por data de vencimento (para o calendário)
+  const despesasPorVencimento = useMemo(() => {
+    const map = new Map<string, Despesa[]>()
+    despesasPendentes.forEach((d) => {
+      if (!d.dataVencimento) return
+      const key = d.dataVencimento
+      const list = map.get(key) ?? []
+      list.push(d)
+      map.set(key, list)
+    })
+    return map
+  }, [despesasPendentes])
 
   // Dias do mês para o calendário
   const diasCalendario = useMemo(() => {
@@ -238,10 +256,10 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Calendário de vencimentos dos boletos */}
+      {/* Calendário de vencimentos */}
       <div className="card" style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-          <h3 style={{ margin: 0 }}>Calendário de boletos</h3>
+          <h3 style={{ margin: 0 }}>Calendário de vencimentos</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               type="button"
@@ -263,7 +281,7 @@ export default function Dashboard() {
           </div>
         </div>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 16 }}>
-          Datas em destaque são vencimentos de boletos cadastrados.
+          Datas em destaque são vencimentos de boletos e despesas pendentes.
         </p>
         <div className="dashboard-calendario">
           <div className="calendario-semana-header">
@@ -278,18 +296,35 @@ export default function Dashboard() {
             {diasCalendario.map((dia) => {
               const key = format(dia, 'yyyy-MM-dd')
               const boletosNoDia = boletosPorVencimento.get(key) ?? []
+              const despesasNoDia = despesasPorVencimento.get(key) ?? []
               const temBoleto = boletosNoDia.length > 0
+              const temDespesa = despesasNoDia.length > 0
               const hoje = isSameDay(dia, new Date())
+
+              const titleParts: string[] = []
+              if (temBoleto) titleParts.push(boletosNoDia.map((b) => `${b.descricao}: ${formatMoney(b.valor)}${b.pago ? ' (pago)' : ''}`).join('\n'))
+              if (temDespesa) titleParts.push(despesasNoDia.map((d) => `${d.descricao}: ${formatMoney(d.valor)}`).join('\n'))
+
               return (
                 <div
                   key={key}
-                  className={`calendario-dia ${temBoleto ? 'calendario-dia-boleto' : ''} ${hoje ? 'calendario-dia-hoje' : ''}`}
-                  title={temBoleto ? boletosNoDia.map((b) => `${b.descricao}: ${formatMoney(b.valor)}${b.pago ? ' (pago)' : ''}`).join('\n') : ''}
+                  className={[
+                    'calendario-dia',
+                    temBoleto ? 'calendario-dia-boleto' : '',
+                    temDespesa ? 'calendario-dia-despesa' : '',
+                    hoje ? 'calendario-dia-hoje' : '',
+                  ].filter(Boolean).join(' ')}
+                  title={titleParts.join('\n')}
                 >
                   <span className="calendario-dia-numero">{format(dia, 'd')}</span>
                   {temBoleto && (
-                    <span className="calendario-dia-badge" title={boletosNoDia.map((b) => b.descricao).join(', ')}>
+                    <span className="calendario-dia-badge">
                       {boletosNoDia.length} boleto(s)
+                    </span>
+                  )}
+                  {temDespesa && (
+                    <span className="calendario-dia-badge-despesa">
+                      {despesasNoDia.length} despesa(s)
                     </span>
                   )}
                 </div>
@@ -299,6 +334,7 @@ export default function Dashboard() {
         </div>
         <div style={{ marginTop: 16, display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
           <span><span className="calendario-legenda-dot calendario-dia-boleto" /> Dia com vencimento de boleto</span>
+          <span><span className="calendario-legenda-dot calendario-dia-despesa" /> Dia com despesa pendente</span>
           <span><span className="calendario-legenda-dot calendario-dia-hoje" /> Hoje</span>
         </div>
       </div>

@@ -37,6 +37,7 @@ export interface MovimentacaoBancaria {
   descricao: string;
   boletoId?: string;
   vendaId?: string;
+  despesaId?: string;
   data: string;
 }
 
