@@ -28,6 +28,14 @@ jobs:
           VITE_ADMIN_LOGIN: ${{ secrets.VITE_ADMIN_LOGIN }}
           VITE_ADMIN_PASS: ${{ secrets.VITE_ADMIN_PASS }}
 
+      - name: Clean remote server
+        run: |
+          lftp -e "set ssl:verify-certificate false; open -u $FTP_USER,$FTP_PASS $FTP_HOST; glob -a rm -rf /public_html/*; bye"
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
