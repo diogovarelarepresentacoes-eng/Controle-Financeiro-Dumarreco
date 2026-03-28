@@ -28,26 +28,24 @@ jobs:
           VITE_ADMIN_LOGIN: ${{ secrets.VITE_ADMIN_LOGIN }}
           VITE_ADMIN_PASS: ${{ secrets.VITE_ADMIN_PASS }}
 
-      - name: Clean remote server
+      - name: Deploy via FTP (Docker + lftp)
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq lftp
-          lftp -u "${FTP_USER},${FTP_PASS}" "${FTP_HOST}" -e "
-            set ssl:verify-certificate false
-            set cmd:fail-exit no
-            glob -a rm -rf /public_html/*
-            bye
-          "
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}/dist:/dist:ro" \
+            -e FTP_HOST -e FTP_USER -e FTP_PASS \
+            alpine:3.19 sh -c '
+              apk add --no-cache lftp &&
+              lftp -u "$FTP_USER,$FTP_PASS" "$FTP_HOST" -e "
+                set ssl:verify-certificate false
+                set ftp:ssl-allow true
+                set cmd:fail-exit no
+                glob -a rm -rf /public_html/*
+                set cmd:fail-exit yes
+                mirror --reverse --delete --verbose /dist/ /public_html/
+                bye
+              "
+            '
         env:
           FTP_HOST: ${{ secrets.FTP_HOST }}
           FTP_USER: ${{ secrets.FTP_USER }}
           FTP_PASS: ${{ secrets.FTP_PASS }}
-
-      - name: Deploy via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_HOST }}
-          username: ${{ secrets.FTP_USER }}
-          password: ${{ secrets.FTP_PASS }}
-          local-dir: ./dist/
-          server-dir: /public_html/
-          dangerous-clean-slate: true
