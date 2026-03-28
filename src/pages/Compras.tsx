@@ -4,6 +4,7 @@ import ptBR from 'date-fns/locale/pt-BR'
 import type { CompraComRelacionamentos, FiltroNf, FiltroStatusPagamento } from '../modules/compras/model'
 import { applyCurrencyMask, parseCurrencyFromInput } from '../utils/currencyMask'
 import { purchasesGateway } from '../services/purchasesGateway'
+import { formatMoney } from '../utils/formatMoney'
 
 const hoje = new Date()
 const mesAtual = format(startOfMonth(hoje), 'yyyy-MM')
@@ -84,8 +85,6 @@ export default function Compras() {
   }, [lista, mesCompetencia])
   const detalhe = detalheId ? lista.find((x) => x.compra.id === detalheId) : undefined
   const compraParaParcelar = modalParcelarCompraId ? lista.find((x) => x.compra.id === modalParcelarCompraId) : undefined
-
-  const formatMoney = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 
   const criarCompraManual = async (e: React.FormEvent) => {
     e.preventDefault()

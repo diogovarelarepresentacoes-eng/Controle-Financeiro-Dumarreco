@@ -1,5 +1,6 @@
 import type { ContaBanco, Boleto, MovimentacaoBancaria, Venda, FaturamentoMensal } from '../types';
 import type { Despesa } from '../modules/despesas/model';
+import { formatMoney } from '../utils/formatMoney';
 
 const KEY_CONTAS = 'controle-financeiro-contas';
 const KEY_BOLETOS = 'controle-financeiro-boletos';
@@ -285,8 +286,7 @@ function descricaoMovimentacao(venda: Venda): string {
   if (venda.formaPagamento === 'cartao' && venda.valorBruto != null && venda.valorTaxaCartao != null && venda.valorLiquido != null) {
     const tipo = venda.tipoPagamentoCartao === 'debito' ? 'DÉBITO' : `CRÉDITO ${venda.quantidadeParcelas ?? 1}x`;
     const maq = venda.maquinaCartaoNome ? ` ${venda.maquinaCartaoNome}` : '';
-    const fmt = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
-    return `Venda: ${venda.descricao} (CARTÃO${maq} ${tipo}) | Bruto: ${fmt(venda.valorBruto)} | Taxa: ${fmt(venda.valorTaxaCartao)} | Líquido: ${fmt(venda.valorLiquido)}`;
+    return `Venda: ${venda.descricao} (CARTÃO${maq} ${tipo}) | Bruto: ${formatMoney(venda.valorBruto)} | Taxa: ${formatMoney(venda.valorTaxaCartao)} | Líquido: ${formatMoney(venda.valorLiquido)}`;
   }
   const forma = venda.formaPagamento === 'pix' ? 'PIX' : venda.formaPagamento === 'cartao' ? 'CARTÃO' : venda.formaPagamento.toUpperCase();
   return `Venda: ${venda.descricao} (${forma})`;

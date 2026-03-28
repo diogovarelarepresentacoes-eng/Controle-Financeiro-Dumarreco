@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import { formatMoney } from '../utils/formatMoney'
 import {
   format,
   startOfMonth,
@@ -61,9 +62,6 @@ export default function Dashboard() {
   const boletosPendentes = boletos.filter((b) => !b.pago)
   const totalPendente = boletosPendentes.reduce((s, b) => s + b.valor, 0)
   const totalVendas = vendas.reduce((s, v) => s + v.valor, 0)
-
-  const formatMoney = (v: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 
   // Entradas de vendas agrupadas por data (para a tabela)
   const vendasPorData: VendasPorData[] = useMemo(() => {

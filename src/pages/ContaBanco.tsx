@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import type { ContaBanco as ContaBancoType, FormaPagamento } from '../types'
 import { storageContas } from '../services/storage'
 import { applyCurrencyMask, parseCurrencyFromInput } from '../utils/currencyMask'
+import { formatMoney } from '../utils/formatMoney'
 
 const FORMAS: FormaPagamento[] = ['pix', 'debito', 'credito']
 
@@ -91,9 +92,6 @@ export default function ContaBanco() {
       load()
     }
   }
-
-  const formatMoney = (v: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 
   return (
     <>

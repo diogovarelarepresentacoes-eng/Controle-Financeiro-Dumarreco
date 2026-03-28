@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { formatMoney } from '../utils/formatMoney'
 import { format } from 'date-fns'
 import ptBR from 'date-fns/locale/pt-BR'
 import { despesasController } from '../modules/despesas/controller'
@@ -103,9 +104,6 @@ export default function Despesas() {
     () => despesasController.dashboardMensal(Number(anoDashboard), Number(mesDashboard)),
     [anoDashboard, mesDashboard, despesas],
   )
-
-  const formatMoney = (v: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 
   const openNew = () => {
     setEditingId(null)

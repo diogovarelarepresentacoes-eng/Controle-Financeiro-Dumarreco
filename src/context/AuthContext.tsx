@@ -1,11 +1,11 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { clearSessao, getSessao, setSessao, validarLogin } from '../services/authStorage'
 
 interface AuthContextValue {
   isAuthenticated: boolean
   usuarioAtual: string | null
-  login: (login: string, senha: string) => boolean
+  login: (login: string, senha: string) => Promise<boolean>
   logout: () => void
 }
 
@@ -14,21 +14,26 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuarioAtual, setUsuarioAtual] = useState<string | null>(() => getSessao())
 
-  function login(login: string, senha: string): boolean {
-    const usuario = validarLogin(login, senha)
+  const login = useCallback(async (login: string, senha: string): Promise<boolean> => {
+    const usuario = await validarLogin(login, senha)
     if (!usuario) return false
     setSessao(usuario.login)
     setUsuarioAtual(usuario.login)
     return true
-  }
+  }, [])
 
-  function logout() {
+  const logout = useCallback(() => {
     clearSessao()
     setUsuarioAtual(null)
-  }
+  }, [])
+
+  const value = useMemo(
+    () => ({ isAuthenticated: usuarioAtual !== null, usuarioAtual, login, logout }),
+    [usuarioAtual, login, logout],
+  )
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated: usuarioAtual !== null, usuarioAtual, login, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   )

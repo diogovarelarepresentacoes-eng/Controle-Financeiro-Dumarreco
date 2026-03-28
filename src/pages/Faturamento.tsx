@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { format, parseISO, startOfMonth, endOfMonth, getYear } from 'date-fns'
 import ptBR from 'date-fns/locale/pt-BR'
+import { formatMoney } from '../utils/formatMoney'
 import {
   BarChart,
   Bar,
@@ -168,8 +169,6 @@ export default function Faturamento() {
     mercadorias: '',
   })
 
-  const formatMoney = (v: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
   const formatPerc = (v: number) => `${(v * 100).toFixed(2)}%`
 
   const reload = useCallback(() => {

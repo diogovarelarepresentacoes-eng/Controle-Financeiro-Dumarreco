@@ -4,11 +4,23 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: true, // Acessível na rede local (ex: http://192.168.x.x:5173)
+    host: true,
     port: 5173,
   },
   preview: {
-    host: true, // Build de produção acessível na rede (ex: http://192.168.x.x:4173)
+    host: true,
     port: 4173,
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-charts': ['recharts'],
+          'vendor-motion': ['framer-motion'],
+          'vendor-date': ['date-fns'],
+        },
+      },
+    },
   },
 })

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns'
 import ptBR from 'date-fns/locale/pt-BR'
 import { storageBoletos, storageContas } from '../services/storage'
+import { formatMoney } from '../utils/formatMoney'
 
 export default function RelatorioBoletosPagos() {
   const hoje = new Date()
@@ -13,9 +14,6 @@ export default function RelatorioBoletosPagos() {
 
   const boletos = useMemo(() => storageBoletos.getAll(), [])
   const contas = useMemo(() => storageContas.getAll(), [])
-
-  const formatMoney = (v: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 
   const nomeConta = (id: string) => contas.find((c) => c.id === id)?.nome ?? '-'
 

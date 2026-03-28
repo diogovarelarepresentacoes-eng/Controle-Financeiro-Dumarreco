@@ -6,9 +6,8 @@ dist/
 
 # Environment
 .env
-.env.docker
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # Logs
 npm-debug.log*

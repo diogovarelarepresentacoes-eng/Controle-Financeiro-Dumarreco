@@ -1,7 +1,12 @@
-# ─── Configurações FTP ───────────────────────────────────────────────────────
-$ftpHost   = '82.25.67.101'
-$ftpUser   = 'u408509279'
-$ftpPass   = 'D&ogo170390Alencar'
+# ─── Configurações FTP (lê de variáveis de ambiente) ─────────────────────────
+$ftpHost   = $env:FTP_HOST
+$ftpUser   = $env:FTP_USER
+$ftpPass   = $env:FTP_PASS
+
+if (-not $ftpHost -or -not $ftpUser -or -not $ftpPass) {
+    Write-Host 'ERRO: Defina as variáveis de ambiente FTP_HOST, FTP_USER e FTP_PASS antes de executar.' -ForegroundColor Red
+    exit 1
+}
 $remotePath = '/public_html'
 $localDist  = Join-Path $PSScriptRoot 'dist'
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { zerarBancoDeDados } from '../services/storage'
 import {
   getUsuarios,
@@ -11,8 +11,7 @@ import {
 export default function Configuracoes() {
   const [confirmando, setConfirmando] = useState(false)
 
-  // Usuários
-  const [usuarios, setUsuarios] = useState<Usuario[]>(() => getUsuarios())
+  const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [novoLogin, setNovoLogin] = useState('')
   const [novaSenha, setNovaSenha] = useState('')
   const [erroNovo, setErroNovo] = useState('')
@@ -21,37 +20,39 @@ export default function Configuracoes() {
   const [senhaAlterada, setSenhaAlterada] = useState('')
   const [erroAlteracao, setErroAlteracao] = useState('')
 
-  const recarregar = () => setUsuarios(getUsuarios())
+  const recarregar = () => { getUsuarios().then(setUsuarios) }
+
+  useEffect(() => { recarregar() }, [])
 
   const zerar = () => {
     zerarBancoDeDados()
     window.location.reload()
   }
 
-  function handleAdicionarUsuario(e: React.FormEvent) {
+  async function handleAdicionarUsuario(e: React.FormEvent) {
     e.preventDefault()
     setErroNovo('')
     if (!novoLogin.trim()) { setErroNovo('Informe um login.'); return }
     if (!novaSenha) { setErroNovo('Informe uma senha.'); return }
     const loginExiste = usuarios.some((u) => u.login.toLowerCase() === novoLogin.trim().toLowerCase())
     if (loginExiste) { setErroNovo('Já existe um usuário com este login.'); return }
-    salvarUsuario({ login: novoLogin, senha: novaSenha })
+    await salvarUsuario({ login: novoLogin, senha: novaSenha })
     setNovoLogin('')
     setNovaSenha('')
     recarregar()
   }
 
-  function handleExcluir(id: string) {
-    excluirUsuario(id)
+  async function handleExcluir(id: string) {
+    await excluirUsuario(id)
     recarregar()
   }
 
-  function handleAlterarSenha(e: React.FormEvent) {
+  async function handleAlterarSenha(e: React.FormEvent) {
     e.preventDefault()
     setErroAlteracao('')
     if (!senhaAlterada) { setErroAlteracao('Informe a nova senha.'); return }
     if (alterandoSenhaId) {
-      alterarSenha(alterandoSenhaId, senhaAlterada)
+      await alterarSenha(alterandoSenhaId, senhaAlterada)
       setAlterandoSenhaId(null)
       setSenhaAlterada('')
       recarregar()

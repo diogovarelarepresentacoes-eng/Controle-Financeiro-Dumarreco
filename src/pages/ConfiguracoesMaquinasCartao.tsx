@@ -5,6 +5,7 @@ import {
   type TaxaMaquinaCartao,
 } from '../services/maquinasCartaoGateway'
 import { storageVendas } from '../services/storage'
+import { MODALIDADES_CARTAO } from '../utils/constants'
 
 const emptyFormMaquina = {
   nome: '',
@@ -18,24 +19,8 @@ const emptyFormTaxa = {
   taxaPercentual: '',
 }
 
-const MODALIDADES: { tipo: 'debito' | 'credito'; parcelas: number; label: string }[] = [
-  { tipo: 'debito', parcelas: 1, label: 'Débito' },
-  { tipo: 'credito', parcelas: 1, label: 'Crédito 1x' },
-  { tipo: 'credito', parcelas: 2, label: 'Crédito 2x' },
-  { tipo: 'credito', parcelas: 3, label: 'Crédito 3x' },
-  { tipo: 'credito', parcelas: 4, label: 'Crédito 4x' },
-  { tipo: 'credito', parcelas: 5, label: 'Crédito 5x' },
-  { tipo: 'credito', parcelas: 6, label: 'Crédito 6x' },
-  { tipo: 'credito', parcelas: 7, label: 'Crédito 7x' },
-  { tipo: 'credito', parcelas: 8, label: 'Crédito 8x' },
-  { tipo: 'credito', parcelas: 9, label: 'Crédito 9x' },
-  { tipo: 'credito', parcelas: 10, label: 'Crédito 10x' },
-  { tipo: 'credito', parcelas: 11, label: 'Crédito 11x' },
-  { tipo: 'credito', parcelas: 12, label: 'Crédito 12x' },
-]
-
 function labelModalidade(t: TaxaMaquinaCartao) {
-  return MODALIDADES.find((m) => m.tipo === t.tipoCartao && m.parcelas === t.parcelas)?.label ?? `${t.tipoCartao} ${t.parcelas}x`
+  return MODALIDADES_CARTAO.find((m) => m.tipo === t.tipoCartao && m.parcelas === t.parcelas)?.label ?? `${t.tipoCartao} ${t.parcelas}x`
 }
 
 export default function ConfiguracoesMaquinasCartao() {

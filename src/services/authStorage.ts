@@ -5,18 +5,36 @@ export interface Usuario {
   root: boolean
 }
 
-const ROOT: Usuario = { id: 'root', login: 'DumarrecoAdmin', senha: '@Duma2018', root: true }
+async function hashSenha(senha: string): Promise<string> {
+  const data = new TextEncoder().encode(senha)
+  const buf = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+const ROOT_LOGIN = import.meta.env.VITE_ADMIN_LOGIN ?? 'DumarrecoAdmin'
+const ROOT_PASS = import.meta.env.VITE_ADMIN_PASS ?? ''
+
+let rootHashCache: string | null = null
+async function getRootHash(): Promise<string> {
+  if (!rootHashCache) rootHashCache = await hashSenha(ROOT_PASS)
+  return rootHashCache
+}
+
+function getRootUser(senhaHash: string): Usuario {
+  return { id: 'root', login: ROOT_LOGIN, senha: senhaHash, root: true }
+}
 
 const CHAVE_USUARIOS = 'controle-financeiro-usuarios'
 const CHAVE_SESSAO = 'controle-financeiro-sessao'
 
-export function getUsuarios(): Usuario[] {
+export async function getUsuarios(): Promise<Usuario[]> {
   try {
     const raw = localStorage.getItem(CHAVE_USUARIOS)
     const lista: Usuario[] = raw ? JSON.parse(raw) : []
-    return [ROOT, ...lista.filter((u) => u.id !== 'root')]
+    const root = getRootUser(await getRootHash())
+    return [root, ...lista.filter((u) => u.id !== 'root')]
   } catch {
-    return [ROOT]
+    return [getRootUser(await getRootHash())]
   }
 }
 
@@ -25,31 +43,33 @@ function salvarLista(lista: Usuario[]): void {
   localStorage.setItem(CHAVE_USUARIOS, JSON.stringify(semRoot))
 }
 
-export function salvarUsuario(usuario: Omit<Usuario, 'id' | 'root'>): void {
-  const lista = getUsuarios()
+export async function salvarUsuario(usuario: Omit<Usuario, 'id' | 'root'>): Promise<void> {
+  const lista = await getUsuarios()
   const novo: Usuario = {
     id: crypto.randomUUID(),
     login: usuario.login.trim(),
-    senha: usuario.senha,
+    senha: await hashSenha(usuario.senha),
     root: false,
   }
   salvarLista([...lista, novo])
 }
 
-export function excluirUsuario(id: string): void {
+export async function excluirUsuario(id: string): Promise<void> {
   if (id === 'root') return
-  const lista = getUsuarios().filter((u) => u.id !== id)
+  const lista = (await getUsuarios()).filter((u) => u.id !== id)
   salvarLista(lista)
 }
 
-export function alterarSenha(id: string, novaSenha: string): void {
-  const lista = getUsuarios().map((u) => (u.id === id ? { ...u, senha: novaSenha } : u))
+export async function alterarSenha(id: string, novaSenha: string): Promise<void> {
+  const hash = await hashSenha(novaSenha)
+  const lista = (await getUsuarios()).map((u) => (u.id === id ? { ...u, senha: hash } : u))
   salvarLista(lista)
 }
 
-export function validarLogin(login: string, senha: string): Usuario | null {
-  const usuario = getUsuarios().find(
-    (u) => u.login === login.trim() && u.senha === senha,
+export async function validarLogin(login: string, senha: string): Promise<Usuario | null> {
+  const hash = await hashSenha(senha)
+  const usuario = (await getUsuarios()).find(
+    (u) => u.login === login.trim() && u.senha === hash,
   )
   return usuario ?? null
 }

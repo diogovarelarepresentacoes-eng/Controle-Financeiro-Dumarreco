@@ -31,17 +31,20 @@ export default function Login() {
   const [carregando, setCarregando] = useState(false)
   const [shakeKey, setShakeKey] = useState(0)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setErro('')
     setCarregando(true)
-    const ok = login(loginVal, senha)
-    setCarregando(false)
-    if (ok) {
-      navigate('/', { replace: true })
-    } else {
-      setErro('Login ou senha inválidos.')
-      setShakeKey((k) => k + 1)
+    try {
+      const ok = await login(loginVal, senha)
+      if (ok) {
+        navigate('/', { replace: true })
+      } else {
+        setErro('Login ou senha inválidos.')
+        setShakeKey((k) => k + 1)
+      }
+    } finally {
+      setCarregando(false)
     }
   }
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import type { Boleto, OrigemPagamento } from '../types'
 import { storageBoletos, storageContas, registrarBaixaBoleto, getSaldoDinheiro } from '../services/storage'
 import { formatDateBR } from '../utils/date'
+import { formatMoney } from '../utils/formatMoney'
 
 export default function BaixaBoleto() {
   const [pendentes, setPendentes] = useState<Boleto[]>([])
@@ -37,9 +38,6 @@ export default function BaixaBoleto() {
     setContaBancoId('')
     load()
   }
-
-  const formatMoney = (v: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 
   return (
     <>

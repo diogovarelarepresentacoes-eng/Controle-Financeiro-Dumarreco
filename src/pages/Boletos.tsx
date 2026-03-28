@@ -3,6 +3,7 @@ import type { Boleto } from '../types'
 import { storageBoletos } from '../services/storage'
 import { applyCurrencyMask, parseCurrencyFromInput, formatCurrencyForInput } from '../utils/currencyMask'
 import { formatDateBR } from '../utils/date'
+import { formatMoney } from '../utils/formatMoney'
 
 export default function Boletos() {
   const [boletos, setBoletos] = useState<Boleto[]>([])
@@ -95,9 +96,6 @@ export default function Boletos() {
     setModalParceladoOpen(false)
     load()
   }
-
-  const formatMoney = (v: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 
   const pendentes = boletos.filter((b) => !b.pago)
   const pagos = boletos.filter((b) => b.pago)
