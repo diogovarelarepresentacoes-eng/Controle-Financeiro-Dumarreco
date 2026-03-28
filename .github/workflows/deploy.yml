@@ -31,7 +31,12 @@ jobs:
       - name: Clean remote server
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq lftp
-          lftp -e "set ssl:verify-certificate false; open -u $FTP_USER,$FTP_PASS $FTP_HOST; glob -a rm -rf /public_html/*; bye"
+          lftp -u "${FTP_USER},${FTP_PASS}" "${FTP_HOST}" -e "
+            set ssl:verify-certificate false
+            set cmd:fail-exit no
+            glob -a rm -rf /public_html/*
+            bye
+          "
         env:
           FTP_HOST: ${{ secrets.FTP_HOST }}
           FTP_USER: ${{ secrets.FTP_USER }}
