@@ -8,7 +8,7 @@ export const despesasController = {
   },
 
   async getById(req: Request, res: Response) {
-    const row = await despesasService.getById(req.params.id)
+    const row = await despesasService.getById(String(req.params.id))
     if (!row) return res.status(404).json({ error: 'Despesa nao encontrada.' })
     return res.json(row)
   },
@@ -32,7 +32,7 @@ export const despesasController = {
       return res.status(400).json({ error: 'Payload invalido.', details: parsed.error.flatten() })
     }
     try {
-      const updated = await despesasService.update(req.params.id, parsed.data)
+      const updated = await despesasService.update(String(req.params.id), parsed.data)
       return res.json(updated)
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao atualizar despesa.' })
@@ -55,7 +55,7 @@ export const despesasController = {
     }
     try {
       const updated = await despesasService.registrarPagamento(
-        req.params.id,
+        String(req.params.id),
         parsed.data.origemPagamento,
         parsed.data.contaBancoId,
         parsed.data.dataPagamento,
@@ -68,7 +68,7 @@ export const despesasController = {
 
   async reverterPagamento(req: Request, res: Response) {
     try {
-      const updated = await despesasService.reverterPagamento(req.params.id)
+      const updated = await despesasService.reverterPagamento(String(req.params.id))
       return res.json(updated)
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao reverter pagamento.' })
@@ -77,7 +77,7 @@ export const despesasController = {
 
   async remove(req: Request, res: Response) {
     try {
-      await despesasService.delete(req.params.id)
+      await despesasService.delete(String(req.params.id))
       return res.status(204).send()
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao excluir despesa.' })
@@ -103,7 +103,7 @@ export const despesasController = {
 
   async clearDeletedRecurrenceMarkersByOrigem(req: Request, res: Response) {
     try {
-      await despesasService.clearDeletedRecurrenceMarkersByOrigem(req.params.origemId)
+      await despesasService.clearDeletedRecurrenceMarkersByOrigem(String(req.params.origemId))
       return res.status(204).send()
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao limpar marcadores.' })

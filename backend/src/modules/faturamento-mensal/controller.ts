@@ -33,7 +33,7 @@ export const faturamentoMensalController = {
 
   async remove(req: Request, res: Response) {
     try {
-      await faturamentoMensalService.delete(req.params.id)
+      await faturamentoMensalService.delete(String(req.params.id))
       return res.status(204).send()
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao excluir faturamento.' })

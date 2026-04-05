@@ -9,7 +9,7 @@ export const boletosController = {
   },
 
   async getById(req: Request, res: Response) {
-    const row = await boletosService.getById(req.params.id)
+    const row = await boletosService.getById(String(req.params.id))
     if (!row) return res.status(404).json({ error: 'Boleto nao encontrado.' })
     return res.json(row)
   },
@@ -41,7 +41,7 @@ export const boletosController = {
       return res.status(400).json({ error: 'Payload invalido.', details: parsed.error.flatten() })
     }
     try {
-      const updated = await boletosService.update(req.params.id, parsed.data)
+      const updated = await boletosService.update(String(req.params.id), parsed.data)
       return res.json(updated)
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao atualizar boleto.' })
@@ -54,7 +54,7 @@ export const boletosController = {
       return res.status(400).json({ error: 'Payload invalido.', details: parsed.error.flatten() })
     }
     try {
-      const updated = await boletosService.registrarBaixa(req.params.id, parsed.data.origem, parsed.data.contaBancoId)
+      const updated = await boletosService.registrarBaixa(String(req.params.id), parsed.data.origem, parsed.data.contaBancoId)
       return res.json(updated)
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao registrar baixa.' })
@@ -63,7 +63,7 @@ export const boletosController = {
 
   async reverterBaixa(req: Request, res: Response) {
     try {
-      const updated = await boletosService.reverterBaixa(req.params.id)
+      const updated = await boletosService.reverterBaixa(String(req.params.id))
       return res.json(updated)
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao reverter baixa.' })
@@ -72,7 +72,7 @@ export const boletosController = {
 
   async remove(req: Request, res: Response) {
     try {
-      await boletosService.delete(req.params.id)
+      await boletosService.delete(String(req.params.id))
       return res.status(204).send()
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao excluir boleto.' })

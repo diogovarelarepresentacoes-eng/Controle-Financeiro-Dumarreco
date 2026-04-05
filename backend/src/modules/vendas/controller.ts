@@ -9,7 +9,7 @@ export const vendasController = {
   },
 
   async getById(req: Request, res: Response) {
-    const row = await vendasService.getById(req.params.id)
+    const row = await vendasService.getById(String(req.params.id))
     if (!row) return res.status(404).json({ error: 'Venda nao encontrada.' })
     return res.json(row)
   },
@@ -33,7 +33,7 @@ export const vendasController = {
       return res.status(400).json({ error: 'Payload invalido.', details: parsed.error.flatten() })
     }
     try {
-      const updated = await vendasService.atualizar(req.params.id, parsed.data)
+      const updated = await vendasService.atualizar(String(req.params.id), parsed.data)
       return res.json(updated)
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao atualizar venda.' })
@@ -42,7 +42,7 @@ export const vendasController = {
 
   async excluir(req: Request, res: Response) {
     try {
-      await vendasService.excluir(req.params.id)
+      await vendasService.excluir(String(req.params.id))
       return res.status(204).send()
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao excluir venda.' })

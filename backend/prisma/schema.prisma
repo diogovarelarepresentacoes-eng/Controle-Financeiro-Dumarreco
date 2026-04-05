@@ -194,6 +194,19 @@ model TaxaMaquinaCartao {
   @@index([maquinaCartaoId, tipoCartao, parcelas])
 }
 
+model TaxaCartao {
+  id                 String   @id @default(uuid())
+  descricao          String
+  tipoCartao         String
+  quantidadeParcelas Int
+  taxaPercentual     Decimal  @db.Decimal(5, 2)
+  ativo              Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([tipoCartao, quantidadeParcelas])
+}
+
 // ── Finance models ──────────────────────────────────────────
 
 model ContaBanco {

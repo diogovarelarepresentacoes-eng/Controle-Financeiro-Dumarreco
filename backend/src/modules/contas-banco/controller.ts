@@ -9,7 +9,7 @@ export const contasBancoController = {
   },
 
   async getById(req: Request, res: Response) {
-    const row = await contasBancoService.getById(req.params.id)
+    const row = await contasBancoService.getById(String(req.params.id))
     if (!row) return res.status(404).json({ error: 'Conta nao encontrada.' })
     return res.json(row)
   },
@@ -33,7 +33,7 @@ export const contasBancoController = {
       return res.status(400).json({ error: 'Payload invalido.', details: parsed.error.flatten() })
     }
     try {
-      const updated = await contasBancoService.update(req.params.id, parsed.data)
+      const updated = await contasBancoService.update(String(req.params.id), parsed.data)
       return res.json(updated)
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao atualizar conta.' })
@@ -42,7 +42,7 @@ export const contasBancoController = {
 
   async remove(req: Request, res: Response) {
     try {
-      await contasBancoService.delete(req.params.id)
+      await contasBancoService.delete(String(req.params.id))
       return res.status(204).send()
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao excluir conta.' })

@@ -9,12 +9,12 @@ export const movimentacoesController = {
   },
 
   async getByConta(req: Request, res: Response) {
-    const rows = await movimentacoesService.getByConta(req.params.contaBancoId)
+    const rows = await movimentacoesService.getByConta(String(req.params.contaBancoId))
     return res.json(rows)
   },
 
   async getByVenda(req: Request, res: Response) {
-    const rows = await movimentacoesService.getByVendaId(req.params.vendaId)
+    const rows = await movimentacoesService.getByVendaId(String(req.params.vendaId))
     return res.json(rows)
   },
 
@@ -33,7 +33,7 @@ export const movimentacoesController = {
 
   async remove(req: Request, res: Response) {
     try {
-      await movimentacoesService.delete(req.params.id)
+      await movimentacoesService.delete(String(req.params.id))
       return res.status(204).send()
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao excluir movimentacao.' })
