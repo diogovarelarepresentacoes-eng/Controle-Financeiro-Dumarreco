@@ -33,7 +33,7 @@ export const authController = {
 
   async excluirUsuario(req: Request, res: Response) {
     try {
-      await authService.excluirUsuario(req.params.id)
+      await authService.excluirUsuario(String(req.params.id))
       return res.status(204).send()
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao excluir usuario.' })
@@ -46,7 +46,7 @@ export const authController = {
       return res.status(400).json({ error: 'Nova senha e obrigatoria.' })
     }
     try {
-      await authService.alterarSenha(req.params.id, novaSenha)
+      await authService.alterarSenha(String(req.params.id), novaSenha)
       return res.status(204).send()
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao alterar senha.' })
