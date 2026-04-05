@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { Boleto } from '../types'
-import { storageBoletos } from '../services/storage'
+import { boletosGateway } from '../services/boletosGateway'
 import { applyCurrencyMask, parseCurrencyFromInput, formatCurrencyForInput } from '../utils/currencyMask'
 import { formatDateBR } from '../utils/date'
 import { formatMoney } from '../utils/formatMoney'
@@ -13,12 +13,14 @@ export default function Boletos() {
   const [modalParceladoOpen, setModalParceladoOpen] = useState(false)
   const [formParcelado, setFormParcelado] = useState({ descricao: '', valor: '', parcelas: 2, vencimento: '' })
 
-  const load = () => {
-    setBoletos(storageBoletos.getAll())
+  const load = async () => {
+    setBoletos(await boletosGateway.getAll())
   }
 
   useEffect(() => {
-    load()
+    void (async () => {
+      await load()
+    })()
   }, [])
 
   const openNew = () => {
@@ -37,17 +39,17 @@ export default function Boletos() {
     setModalOpen(true)
   }
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     const valor = parseCurrencyFromInput(form.valor)
     if (!form.descricao.trim()) return
     const vencimento = form.vencimento || new Date().toISOString().slice(0, 10)
     if (editingId) {
-      const existente = storageBoletos.getById(editingId)
+      const existente = await boletosGateway.getById(editingId)
       if (existente) {
         const valorFinal = existente.pago ? existente.valor : (valor <= 0 ? existente.valor : valor)
         if (!existente.pago && valor <= 0) return
-        storageBoletos.save({
+        await boletosGateway.save({
           ...existente,
           descricao: form.descricao.trim(),
           valor: valorFinal,
@@ -56,7 +58,7 @@ export default function Boletos() {
       }
     } else {
       if (valor <= 0) return
-      storageBoletos.save({
+      await boletosGateway.save({
         id: crypto.randomUUID(),
         descricao: form.descricao.trim(),
         valor,
@@ -68,10 +70,10 @@ export default function Boletos() {
     setForm({ descricao: '', valor: '', vencimento: '' })
     setEditingId(null)
     setModalOpen(false)
-    load()
+    await load()
   }
 
-  const submitParcelado = (e: React.FormEvent) => {
+  const submitParcelado = async (e: React.FormEvent) => {
     e.preventDefault()
     const valorTotal = parseCurrencyFromInput(formParcelado.valor)
     const parcelas = Math.min(24, Math.max(2, formParcelado.parcelas))
@@ -83,7 +85,7 @@ export default function Boletos() {
       const venc = new Date(dt)
       venc.setMonth(venc.getMonth() + i)
       const vencStr = venc.toISOString().slice(0, 10)
-      storageBoletos.save({
+      await boletosGateway.save({
         id: crypto.randomUUID(),
         descricao: `${formParcelado.descricao.trim()} (${i + 1}/${parcelas} - Cartão crédito)`,
         valor: Math.round(valorParcela * 100) / 100,
@@ -94,11 +96,12 @@ export default function Boletos() {
     }
     setFormParcelado({ descricao: '', valor: '', parcelas: 2, vencimento: '' })
     setModalParceladoOpen(false)
-    load()
+    await load()
   }
 
   const pendentes = boletos.filter((b) => !b.pago)
   const pagos = boletos.filter((b) => b.pago)
+  const editingBoleto = editingId ? boletos.find((b) => b.id === editingId) : undefined
 
   return (
     <>
@@ -217,9 +220,9 @@ export default function Boletos() {
                   onChange={(e) => setForm((f) => ({ ...f, valor: applyCurrencyMask(e.target.value) }))}
                   placeholder="R$ 0,00"
                   inputMode="decimal"
-                  readOnly={!!editingId && !!storageBoletos.getById(editingId || '')?.pago}
+                  readOnly={!!editingId && !!editingBoleto?.pago}
                 />
-                {editingId && storageBoletos.getById(editingId || '')?.pago && (
+                {editingId && editingBoleto?.pago && (
                   <p style={{ marginTop: 4, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                     Valor não pode ser alterado em boletos já pagos.
                   </p>

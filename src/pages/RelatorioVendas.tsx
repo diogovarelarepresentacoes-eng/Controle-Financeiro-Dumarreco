@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { format, parseISO, startOfMonth, endOfMonth, subDays } from 'date-fns'
 import ptBR from 'date-fns/locale/pt-BR'
-import { storageContas, storageVendas } from '../services/storage'
+import { contasBancoGateway } from '../services/contasBancoGateway'
+import { vendasGateway } from '../services/vendasGateway'
 import { formatMoney } from '../utils/formatMoney'
+import type { ContaBanco, Venda } from '../types'
 
 export default function RelatorioVendas() {
   const hoje = new Date()
@@ -11,9 +13,20 @@ export default function RelatorioVendas() {
 
   const [dataInicioVendas, setDataInicioVendas] = useState(dataInicioPadrao)
   const [dataFimVendas, setDataFimVendas] = useState(dataFimPadrao)
+  const [vendas, setVendas] = useState<Venda[]>([])
+  const [contas, setContas] = useState<ContaBanco[]>([])
 
-  const vendas = useMemo(() => storageVendas.getAll(), [])
-  const contas = useMemo(() => storageContas.getAll(), [])
+  useEffect(() => {
+    const load = async () => {
+      const [v, c] = await Promise.all([
+        vendasGateway.getAll(),
+        contasBancoGateway.getAll(),
+      ])
+      setVendas(v)
+      setContas(c)
+    }
+    load()
+  }, [])
 
   const nomeConta = (id: string) => contas.find((c) => c.id === id)?.nome ?? '-'
 

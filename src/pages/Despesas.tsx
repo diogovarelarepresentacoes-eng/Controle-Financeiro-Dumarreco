@@ -15,7 +15,7 @@ import {
 } from '../modules/despesas/model'
 import { applyCurrencyMask, formatCurrencyForInput, parseCurrencyFromInput } from '../utils/currencyMask'
 import { formatDateBR } from '../utils/date'
-import { storageContas } from '../services/storage'
+import { contasBancoGateway } from '../services/contasBancoGateway'
 import type { ContaBanco } from '../types'
 
 const STATUS_OPTIONS: Array<{ value: StatusDespesa; label: string }> = [
@@ -83,7 +83,7 @@ export default function Despesas() {
   const [mesDashboard, setMesDashboard] = useState(String(competencia.mes).padStart(2, '0'))
   const [anoDashboard, setAnoDashboard] = useState(String(competencia.ano))
 
-  const load = () => {
+  const load = async () => {
     const list = despesasController.listar({
       dataInicio: filtroDataInicio,
       dataFim: filtroDataFim,
@@ -92,7 +92,7 @@ export default function Despesas() {
       busca: filtroBusca,
     })
     setDespesas(list)
-    setContas(storageContas.getAll().filter((c) => c.ativo))
+    setContas((await contasBancoGateway.getAll()).filter((c) => c.ativo))
   }
 
   useEffect(() => {

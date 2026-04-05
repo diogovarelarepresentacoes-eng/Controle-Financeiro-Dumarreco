@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { zerarBancoDeDados } from '../services/storage'
+import { zerarBancoDeDados, storageContas, storageBoletos, storageMovimentacoes, storageVendas, storageFaturamentoMensal } from '../services/storage'
+import { despesasRepository } from '../modules/despesas/repository'
 import {
   getUsuarios,
   salvarUsuario,
@@ -7,6 +8,29 @@ import {
   alterarSenha,
   type Usuario,
 } from '../services/authStorage'
+
+function exportarDadosLocais() {
+  const dados = {
+    exportadoEm: new Date().toISOString(),
+    contas: storageContas.getAll(),
+    boletos: storageBoletos.getAll(),
+    movimentacoes: storageMovimentacoes.getAll(),
+    vendas: storageVendas.getAll(),
+    faturamentoMensal: storageFaturamentoMensal.getAll(),
+    despesas: despesasRepository.getAll(),
+    despesasDeletedRecurrences: despesasRepository.getDeletedRecurrenceMarkers(),
+  }
+  const json = JSON.stringify(dados, null, 2)
+  const blob = new Blob([json], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `controle-financeiro-export-${new Date().toISOString().slice(0, 10)}.json`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
 
 export default function Configuracoes() {
   const [confirmando, setConfirmando] = useState(false)
@@ -163,6 +187,22 @@ export default function Configuracoes() {
           </div>
           {erroNovo && <p style={{ color: 'var(--danger, #e53e3e)', fontSize: '0.85rem', margin: 0 }}>{erroNovo}</p>}
         </form>
+      </div>
+
+      {/* Exportar dados locais para migração */}
+      <div className="card" style={{ maxWidth: 560, marginBottom: 24 }}>
+        <h2 style={{ marginBottom: 8 }}>Exportar dados locais</h2>
+        <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>
+          Exporta todos os dados armazenados localmente (contas, boletos, vendas, movimentações, despesas, faturamento) em um arquivo JSON.
+          Use para migrar os dados para o servidor centralizado (PostgreSQL).
+        </p>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={exportarDadosLocais}
+        >
+          Exportar dados locais (JSON)
+        </button>
       </div>
 
       {/* Zerar banco de dados */}

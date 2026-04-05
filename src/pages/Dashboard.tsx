@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { formatMoney } from '../utils/formatMoney'
 import {
@@ -23,11 +23,14 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
-import { storageContas, storageBoletos, storageVendas, getSaldoDinheiro } from '../services/storage'
-import type { Boleto } from '../types'
+import { contasBancoGateway } from '../services/contasBancoGateway'
+import { boletosGateway } from '../services/boletosGateway'
+import { vendasGateway } from '../services/vendasGateway'
+import type { Boleto, ContaBanco, Venda } from '../types'
 import { StatCard } from '../components/ui/StatCard'
 import { despesasController } from '../modules/despesas/controller'
 import type { Despesa } from '../modules/despesas/model'
+import { computeSaldoDinheiro } from '../utils/saldoDinheiro'
 
 type VendasPorData = {
   data: string
@@ -48,17 +51,32 @@ type VendasPorMes = {
 }
 
 export default function Dashboard() {
-  const [contas] = useState(() => storageContas.getAll())
-  const [vendas] = useState(() => storageVendas.getAll())
-  const [boletos] = useState(() => storageBoletos.getAll())
-  const [despesasPendentes] = useState<Despesa[]>(() =>
-    despesasController.listar({ status: 'pendente' })
-  )
+  const [contas, setContas] = useState<ContaBanco[]>([])
+  const [vendas, setVendas] = useState<Venda[]>([])
+  const [boletos, setBoletos] = useState<Boleto[]>([])
+  const [despesasPendentes, setDespesasPendentes] = useState<Despesa[]>([])
+  const [despesasTodas, setDespesasTodas] = useState<Despesa[]>([])
   const [mesCalendario, setMesCalendario] = useState(() => new Date())
+
+  useEffect(() => {
+    const load = async () => {
+      const [c, v, b] = await Promise.all([
+        contasBancoGateway.getAll(),
+        vendasGateway.getAll(),
+        boletosGateway.getAll(),
+      ])
+      setContas(c)
+      setVendas(v)
+      setBoletos(b)
+      setDespesasPendentes(despesasController.listar({ status: 'pendente' }))
+      setDespesasTodas(despesasController.listar())
+    }
+    load()
+  }, [])
 
   const contasHabilitadas = contas.filter((c) => c.ativo)
   const totalSaldoBancario = contasHabilitadas.reduce((s, c) => s + c.saldoAtual, 0)
-  const saldoDinheiro = getSaldoDinheiro()
+  const saldoDinheiro = useMemo(() => computeSaldoDinheiro(vendas, boletos, despesasTodas), [vendas, boletos, despesasTodas])
   const boletosPendentes = boletos.filter((b) => !b.pago)
   const totalPendente = boletosPendentes.reduce((s, b) => s + b.valor, 0)
   const totalVendas = vendas.reduce((s, v) => s + v.valor, 0)

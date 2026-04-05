@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { ContaBanco as ContaBancoType, FormaPagamento } from '../types'
-import { storageContas } from '../services/storage'
+import { contasBancoGateway } from '../services/contasBancoGateway'
 import { applyCurrencyMask, parseCurrencyFromInput } from '../utils/currencyMask'
 import { formatMoney } from '../utils/formatMoney'
 
@@ -23,9 +23,14 @@ export default function ContaBanco() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
 
-  const load = () => setContas(storageContas.getAll())
+  const loadContas = async () => {
+    setContas(await contasBancoGateway.getAll())
+  }
 
   useEffect(() => {
+    const load = async () => {
+      await loadContas()
+    }
     load()
   }, [])
 
@@ -62,19 +67,19 @@ export default function ContaBanco() {
     }))
   }
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     const agora = new Date().toISOString()
     if (editingId) {
       const existente = contas.find((c) => c.id === editingId)!
-      storageContas.save({
+      await contasBancoGateway.save({
         ...existente,
         ...form,
         saldoAtual: existente.saldoAtual,
       })
     } else {
       const saldoInicial = parseCurrencyFromInput(saldoInicialDisplay)
-      storageContas.save({
+      await contasBancoGateway.save({
         id: crypto.randomUUID(),
         ...form,
         saldoInicial,
@@ -83,13 +88,13 @@ export default function ContaBanco() {
       })
     }
     setModalOpen(false)
-    load()
+    await loadContas()
   }
 
-  const remove = (id: string) => {
+  const remove = async (id: string) => {
     if (window.confirm('Excluir esta conta?')) {
-      storageContas.delete(id)
-      load()
+      await contasBancoGateway.delete(id)
+      await loadContas()
     }
   }
 

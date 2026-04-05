@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { format, parseISO, startOfMonth, endOfMonth, getYear } from 'date-fns'
 import ptBR from 'date-fns/locale/pt-BR'
 import { formatMoney } from '../utils/formatMoney'
@@ -13,8 +13,10 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
-import { storageVendas, storageBoletos, storageFaturamentoMensal } from '../services/storage'
-import type { FaturamentoMensal as FaturamentoMensalType } from '../types'
+import { vendasGateway } from '../services/vendasGateway'
+import { boletosGateway } from '../services/boletosGateway'
+import { faturamentoGateway } from '../services/faturamentoGateway'
+import type { Boleto, FaturamentoMensal as FaturamentoMensalType, Venda } from '../types'
 import { applyCurrencyMask, parseCurrencyFromInput, formatCurrencyForInput } from '../utils/currencyMask'
 import { comprasController } from '../modules/compras/controller'
 import { despesasController } from '../modules/despesas/controller'
@@ -155,10 +157,25 @@ function buildLinhasAno(
 export default function Faturamento() {
   const anoAtual = new Date().getFullYear()
   const [anoSelecionado, setAnoSelecionado] = useState(anoAtual)
-  const [vendas, setVendas] = useState(() => storageVendas.getAll())
-  const [boletos, setBoletos] = useState(() => storageBoletos.getAll())
+  const [vendas, setVendas] = useState<Venda[]>([])
+  const [boletos, setBoletos] = useState<Boleto[]>([])
   const [despesas, setDespesas] = useState(() => despesasController.listar())
-  const [faturamentoMensal, setFaturamentoMensal] = useState(() => storageFaturamentoMensal.getAll())
+  const [faturamentoMensal, setFaturamentoMensal] = useState<FaturamentoMensalType[]>([])
+
+  useEffect(() => {
+    const load = async () => {
+      const [v, b, f] = await Promise.all([
+        vendasGateway.getAll(),
+        boletosGateway.getAll(),
+        faturamentoGateway.getAll(),
+      ])
+      setVendas(v)
+      setBoletos(b)
+      setFaturamentoMensal(f)
+      setDespesas(despesasController.listar())
+    }
+    load()
+  }, [])
   const [modalMes, setModalMes] = useState<{ ano: number; mes: number } | null>(null)
   const [form, setForm] = useState({
     valorInventarioInicio: '',
@@ -171,11 +188,16 @@ export default function Faturamento() {
 
   const formatPerc = (v: number) => `${(v * 100).toFixed(2)}%`
 
-  const reload = useCallback(() => {
-    setVendas(storageVendas.getAll())
-    setBoletos(storageBoletos.getAll())
+  const reload = useCallback(async () => {
+    const [v, b, f] = await Promise.all([
+      vendasGateway.getAll(),
+      boletosGateway.getAll(),
+      faturamentoGateway.getAll(),
+    ])
+    setVendas(v)
+    setBoletos(b)
+    setFaturamentoMensal(f)
     setDespesas(despesasController.listar())
-    setFaturamentoMensal(storageFaturamentoMensal.getAll())
   }, [])
 
   const comprasResumoPorAno = useMemo(() => {
@@ -252,7 +274,7 @@ export default function Faturamento() {
     setModalMes({ ano, mes })
   }
 
-  const salvarDadosMes = (e: React.FormEvent) => {
+  const salvarDadosMes = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!modalMes) return
     const existente = faturamentoMensal.find((f) => f.ano === modalMes.ano && f.mes === modalMes.mes)
@@ -278,8 +300,8 @@ export default function Faturamento() {
       criadoEm: existente?.criadoEm ?? new Date().toISOString(),
       atualizadoEm: new Date().toISOString(),
     }
-    storageFaturamentoMensal.save(item)
-    reload()
+    await faturamentoGateway.save(item)
+    await reload()
     setModalMes(null)
   }
 

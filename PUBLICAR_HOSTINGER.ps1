@@ -7,7 +7,7 @@ if (-not $ftpHost -or -not $ftpUser -or -not $ftpPass) {
     Write-Host 'ERRO: Defina as variáveis de ambiente FTP_HOST, FTP_USER e FTP_PASS antes de executar.' -ForegroundColor Red
     exit 1
 }
-$remotePath = '/public_html'
+$remotePath = ''
 $localDist  = Join-Path $PSScriptRoot 'dist'
 
 # ─── Helpers FTP ─────────────────────────────────────────────────────────────

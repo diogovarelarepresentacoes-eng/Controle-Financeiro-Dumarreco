@@ -288,14 +288,17 @@ function descricaoMovimentacao(venda: Venda): string {
     const maq = venda.maquinaCartaoNome ? ` ${venda.maquinaCartaoNome}` : '';
     return `Venda: ${venda.descricao} (CARTÃO${maq} ${tipo}) | Bruto: ${formatMoney(venda.valorBruto)} | Taxa: ${formatMoney(venda.valorTaxaCartao)} | Líquido: ${formatMoney(venda.valorLiquido)}`;
   }
+  if (venda.formaPagamento === 'cheque') {
+    return `Venda: ${venda.descricao} (CHEQUE)`;
+  }
   const forma = venda.formaPagamento === 'pix' ? 'PIX' : venda.formaPagamento === 'cartao' ? 'CARTÃO' : venda.formaPagamento.toUpperCase();
   return `Venda: ${venda.descricao} (${forma})`;
 }
 
-/** Registra uma venda. Se PIX/cartão com contaBancoId, credita na conta (valor líquido para cartão). */
+/** Registra uma venda. Se PIX/cartão/cheque com contaBancoId, credita na conta (valor líquido para cartão). */
 export function registrarVenda(venda: Venda): Venda {
   storageVendas.save(venda);
-  const formaCartaoOuPix = venda.formaPagamento === 'pix' || venda.formaPagamento === 'cartao';
+  const formaCartaoOuPix = venda.formaPagamento === 'pix' || venda.formaPagamento === 'cartao' || venda.formaPagamento === 'cheque';
   if (formaCartaoOuPix && venda.contaBancoId) {
     const valor = valorParaMovimentacao(venda);
     storageMovimentacoes.add({
@@ -325,7 +328,7 @@ function reverterMovimentacaoVenda(vendaId: string) {
 export function atualizarVenda(venda: Venda): Venda {
   const antiga = storageVendas.getById(venda.id);
   if (antiga) {
-    const formaCartaoOuPixAntiga = antiga.formaPagamento === 'pix' || antiga.formaPagamento === 'cartao';
+    const formaCartaoOuPixAntiga = antiga.formaPagamento === 'pix' || antiga.formaPagamento === 'cartao' || antiga.formaPagamento === 'cheque';
     if (formaCartaoOuPixAntiga && antiga.contaBancoId) {
       reverterMovimentacaoVenda(antiga.id);
     }
@@ -337,7 +340,7 @@ export function atualizarVenda(venda: Venda): Venda {
 export function excluirVenda(vendaId: string): void {
   const existente = storageVendas.getById(vendaId);
   if (!existente) return;
-  const formaCartaoOuPix = existente.formaPagamento === 'pix' || existente.formaPagamento === 'cartao';
+  const formaCartaoOuPix = existente.formaPagamento === 'pix' || existente.formaPagamento === 'cartao' || existente.formaPagamento === 'cheque';
   if (formaCartaoOuPix && existente.contaBancoId) {
     reverterMovimentacaoVenda(existente.id);
   }

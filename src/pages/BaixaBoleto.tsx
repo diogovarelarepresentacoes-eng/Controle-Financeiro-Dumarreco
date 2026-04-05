@@ -1,28 +1,45 @@
-import { useState, useEffect } from 'react'
-import type { Boleto, OrigemPagamento } from '../types'
-import { storageBoletos, storageContas, registrarBaixaBoleto, getSaldoDinheiro } from '../services/storage'
+import { useState, useEffect, useMemo } from 'react'
+import type { Boleto, ContaBanco, Venda, OrigemPagamento } from '../types'
+import { boletosGateway } from '../services/boletosGateway'
+import { contasBancoGateway } from '../services/contasBancoGateway'
+import { vendasGateway } from '../services/vendasGateway'
 import { formatDateBR } from '../utils/date'
 import { formatMoney } from '../utils/formatMoney'
+import { computeSaldoDinheiro } from '../utils/saldoDinheiro'
+import { despesasController } from '../modules/despesas/controller'
 
 export default function BaixaBoleto() {
   const [pendentes, setPendentes] = useState<Boleto[]>([])
-  const [contas, setContas] = useState(storageContas.getAll().filter((c) => c.ativo))
+  const [allBoletos, setAllBoletos] = useState<Boleto[]>([])
+  const [contas, setContas] = useState<ContaBanco[]>([])
+  const [vendas, setVendas] = useState<Venda[]>([])
   const [selecionado, setSelecionado] = useState<Boleto | null>(null)
   const [origem, setOrigem] = useState<OrigemPagamento>('dinheiro')
   const [contaBancoId, setContaBancoId] = useState('')
 
-  const load = () => {
-    setPendentes(storageBoletos.getPendentes())
-    setContas(storageContas.getAll().filter((c) => c.ativo))
+  const load = async () => {
+    const [pend, todos, todasContas, v] = await Promise.all([
+      boletosGateway.getPendentes(),
+      boletosGateway.getAll(),
+      contasBancoGateway.getAll(),
+      vendasGateway.getAll(),
+    ])
+    setPendentes(pend)
+    setAllBoletos(todos)
+    setContas(todasContas.filter((c) => c.ativo))
+    setVendas(v)
   }
 
   useEffect(() => {
-    load()
+    void (async () => {
+      await load()
+    })()
   }, [])
 
-  const saldoDinheiro = getSaldoDinheiro()
+  const despesas = useMemo(() => despesasController.listar(), [allBoletos])
+  const saldoDinheiro = useMemo(() => computeSaldoDinheiro(vendas, allBoletos, despesas), [vendas, allBoletos, despesas])
 
-  const darBaixa = () => {
+  const darBaixa = async () => {
     if (!selecionado) return
     if (origem === 'dinheiro' && saldoDinheiro < selecionado.valor) {
       alert(`Saldo em dinheiro insuficiente. Saldo disponível: ${formatMoney(saldoDinheiro)}. Valor do boleto: ${formatMoney(selecionado.valor)}.`)
@@ -32,11 +49,11 @@ export default function BaixaBoleto() {
       alert('Selecione a conta banco de origem do pagamento.')
       return
     }
-    registrarBaixaBoleto(selecionado, origem, origem === 'conta_banco' ? contaBancoId : undefined)
+    await boletosGateway.registrarBaixa(selecionado, origem, origem === 'conta_banco' ? contaBancoId : undefined)
     setSelecionado(null)
     setOrigem('dinheiro')
     setContaBancoId('')
-    load()
+    await load()
   }
 
   return (

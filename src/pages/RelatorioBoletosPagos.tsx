@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns'
 import ptBR from 'date-fns/locale/pt-BR'
-import { storageBoletos, storageContas } from '../services/storage'
+import { boletosGateway } from '../services/boletosGateway'
+import { contasBancoGateway } from '../services/contasBancoGateway'
 import { formatMoney } from '../utils/formatMoney'
+import type { Boleto, ContaBanco } from '../types'
 
 export default function RelatorioBoletosPagos() {
   const hoje = new Date()
@@ -11,9 +13,20 @@ export default function RelatorioBoletosPagos() {
 
   const [dataInicioBoletos, setDataInicioBoletos] = useState(dataInicioPadrao)
   const [dataFimBoletos, setDataFimBoletos] = useState(dataFimPadrao)
+  const [boletos, setBoletos] = useState<Boleto[]>([])
+  const [contas, setContas] = useState<ContaBanco[]>([])
 
-  const boletos = useMemo(() => storageBoletos.getAll(), [])
-  const contas = useMemo(() => storageContas.getAll(), [])
+  useEffect(() => {
+    const load = async () => {
+      const [b, c] = await Promise.all([
+        boletosGateway.getAll(),
+        contasBancoGateway.getAll(),
+      ])
+      setBoletos(b)
+      setContas(c)
+    }
+    load()
+  }, [])
 
   const nomeConta = (id: string) => contas.find((c) => c.id === id)?.nome ?? '-'
 

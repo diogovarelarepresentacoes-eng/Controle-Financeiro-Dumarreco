@@ -193,3 +193,125 @@ model TaxaMaquinaCartao {
   @@unique([maquinaCartaoId, tipoCartao, parcelas])
   @@index([maquinaCartaoId, tipoCartao, parcelas])
 }
+
+// ── Finance models ──────────────────────────────────────────
+
+model ContaBanco {
+  id            String                @id @default(uuid())
+  nome          String
+  banco         String
+  agencia       String
+  conta         String
+  saldoInicial  Decimal               @db.Decimal(14, 2)
+  saldoAtual    Decimal               @db.Decimal(14, 2)
+  formasAceitas Json                  @default("[]")
+  ativo         Boolean               @default(true)
+  criadoEm      DateTime              @default(now())
+  movimentacoes MovimentacaoBancaria[]
+  boletos       Boleto[]
+  vendas        Venda[]
+  despesas      Despesa[]
+}
+
+model Boleto {
+  id               String       @id @default(uuid())
+  descricao        String
+  valor            Decimal      @db.Decimal(14, 2)
+  vencimento       String
+  pago             Boolean      @default(false)
+  dataPagamento    String?
+  origemPagamento  String?
+  contaBancoId     String?
+  contaBanco       ContaBanco?  @relation(fields: [contaBancoId], references: [id], onDelete: SetNull)
+  compraId         String?
+  criadoEm         DateTime     @default(now())
+  movimentacoes    MovimentacaoBancaria[]
+}
+
+model MovimentacaoBancaria {
+  id            String      @id @default(uuid())
+  contaBancoId  String
+  contaBanco    ContaBanco  @relation(fields: [contaBancoId], references: [id], onDelete: Cascade)
+  tipo          String
+  valor         Decimal     @db.Decimal(14, 2)
+  descricao     String
+  boletoId      String?
+  boleto        Boleto?     @relation(fields: [boletoId], references: [id], onDelete: SetNull)
+  vendaId       String?
+  venda         Venda?      @relation(fields: [vendaId], references: [id], onDelete: SetNull)
+  despesaId     String?
+  despesa       Despesa?    @relation(fields: [despesaId], references: [id], onDelete: SetNull)
+  data          String
+}
+
+model Venda {
+  id                     String      @id @default(uuid())
+  descricao              String
+  valor                  Decimal     @db.Decimal(14, 2)
+  formaPagamento         String
+  contaBancoId           String?
+  contaBanco             ContaBanco? @relation(fields: [contaBancoId], references: [id], onDelete: SetNull)
+  data                   String
+  criadoEm               DateTime    @default(now())
+  maquinaCartaoId        String?
+  maquinaCartaoNome      String?
+  tipoPagamentoCartao    String?
+  quantidadeParcelas     Int?
+  valorBruto             Decimal?    @db.Decimal(14, 2)
+  taxaPercentualCartao   Decimal?    @db.Decimal(5, 2)
+  valorTaxaCartao        Decimal?    @db.Decimal(14, 2)
+  valorLiquido           Decimal?    @db.Decimal(14, 2)
+  observacaoFinanceira   String?
+  movimentacoes          MovimentacaoBancaria[]
+}
+
+model FaturamentoMensal {
+  id                          String   @id @default(uuid())
+  ano                         Int
+  mes                         Int
+  valorInventarioInicio       Decimal  @db.Decimal(14, 2) @default(0)
+  usarInventarioInicioManual  Boolean  @default(false)
+  valorInventarioFim          Decimal  @db.Decimal(14, 2) @default(0)
+  usarInventarioFimManual     Boolean  @default(false)
+  comprasDoMes                Decimal  @db.Decimal(14, 2) @default(0)
+  compraSemNota               Decimal  @db.Decimal(14, 2) @default(0)
+  acordos                     Decimal  @db.Decimal(14, 2) @default(0)
+  mercadorias                 Decimal  @db.Decimal(14, 2) @default(0)
+  criadoEm                    DateTime @default(now())
+  atualizadoEm                DateTime @updatedAt
+
+  @@unique([ano, mes])
+}
+
+model Despesa {
+  id                   String                @id @default(uuid())
+  descricao            String
+  categoria            String
+  tipo                 String
+  valor                Decimal               @db.Decimal(14, 2)
+  dataVencimento       String
+  dataPagamento        String?
+  status               String                @default("pendente")
+  formaPagamento       String
+  origemPagamento      String?
+  contaBancoId         String?
+  contaBanco           ContaBanco?           @relation(fields: [contaBancoId], references: [id], onDelete: SetNull)
+  fornecedor           String                @default("")
+  centroCusto          String                @default("")
+  observacoes          String                @default("")
+  recorrente           Boolean               @default(false)
+  periodicidade        String?
+  recorrenciaOrigemId  String?
+  criadoEm             DateTime              @default(now())
+  atualizadoEm         DateTime              @updatedAt
+  movimentacoes        MovimentacaoBancaria[]
+}
+
+model DeletedRecurrenceMarker {
+  id              String   @id @default(uuid())
+  origemId        String
+  dataVencimento  String
+  deletedAt       DateTime @default(now())
+
+  @@unique([origemId, dataVencimento])
+}

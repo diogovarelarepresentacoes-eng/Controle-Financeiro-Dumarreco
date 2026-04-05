@@ -41,8 +41,8 @@ export interface MovimentacaoBancaria {
   data: string;
 }
 
-/** Forma de pagamento na venda: PIX, dinheiro, cartão */
-export type FormaPagamentoVenda = 'pix' | 'dinheiro' | 'cartao';
+/** Forma de pagamento na venda: PIX, dinheiro, cartão ou cheque */
+export type FormaPagamentoVenda = 'pix' | 'dinheiro' | 'cartao' | 'cheque';
 
 /** Tipo de cartão: débito ou crédito */
 export type TipoPagamentoCartao = 'debito' | 'credito';

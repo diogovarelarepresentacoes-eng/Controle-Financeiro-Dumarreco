@@ -4,7 +4,7 @@ import {
   type MaquinaCartao,
   type TaxaMaquinaCartao,
 } from '../services/maquinasCartaoGateway'
-import { storageVendas } from '../services/storage'
+import { vendasGateway } from '../services/vendasGateway'
 import { MODALIDADES_CARTAO } from '../utils/constants'
 
 const emptyFormMaquina = {
@@ -118,7 +118,8 @@ export default function ConfiguracoesMaquinasCartao() {
   }
 
   const removeMaquina = async (m: MaquinaCartao) => {
-    const vendasComMaquina = storageVendas.getAll().filter((v) => v.maquinaCartaoId === m.id)
+    const todasVendas = await vendasGateway.getAll()
+    const vendasComMaquina = todasVendas.filter((v) => v.maquinaCartaoId === m.id)
     if (vendasComMaquina.length > 0) {
       alert(`Não é possível excluir. Existem ${vendasComMaquina.length} venda(s) vinculada(s) a esta máquina.`)
       return
