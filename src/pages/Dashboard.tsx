@@ -38,6 +38,7 @@ type VendasPorData = {
   pix: number
   dinheiro: number
   cartao: number
+  cheque: number
   total: number
 }
 
@@ -83,10 +84,10 @@ export default function Dashboard() {
 
   // Entradas de vendas agrupadas por data (para a tabela)
   const vendasPorData: VendasPorData[] = useMemo(() => {
-    const map = new Map<string, { pix: number; dinheiro: number; cartao: number }>()
+    const map = new Map<string, { pix: number; dinheiro: number; cartao: number; cheque: number }>()
     vendas.forEach((v) => {
       const key = v.data
-      const cur = map.get(key) ?? { pix: 0, dinheiro: 0, cartao: 0 }
+      const cur = map.get(key) ?? { pix: 0, dinheiro: 0, cartao: 0, cheque: 0 }
       cur[v.formaPagamento] += v.valor
       map.set(key, cur)
     })
@@ -97,7 +98,8 @@ export default function Dashboard() {
         pix: vals.pix,
         dinheiro: vals.dinheiro,
         cartao: vals.cartao,
-        total: vals.pix + vals.dinheiro + vals.cartao,
+        cheque: vals.cheque,
+        total: vals.pix + vals.dinheiro + vals.cartao + vals.cheque,
       }))
       .sort((a, b) => b.data.localeCompare(a.data))
   }, [vendas])
