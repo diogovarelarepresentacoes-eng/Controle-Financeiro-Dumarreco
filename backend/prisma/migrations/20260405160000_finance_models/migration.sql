@@ -1,4 +1,4 @@
-﻿-- CreateTable
+-- CreateTable
 CREATE TABLE "TaxaCartao" (
     "id" TEXT NOT NULL,
     "descricao" TEXT NOT NULL,
