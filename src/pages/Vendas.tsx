@@ -8,7 +8,7 @@ import { calcularValorLiquidoCartao } from '../services/taxaCartaoService'
 import { formatMoney } from '../utils/formatMoney'
 import { MODALIDADES_CARTAO } from '../utils/constants'
 
-const FORMAS: FormaPagamentoVenda[] = ['pix', 'dinheiro', 'cartao']
+const FORMAS: FormaPagamentoVenda[] = ['pix', 'dinheiro', 'cartao', 'cheque']
 
 const emptyForm = {
   descricao: '',
@@ -38,7 +38,7 @@ export default function Vendas() {
     load()
   }, [])
 
-  const exigeContaBanco = form.formaPagamento === 'pix' || form.formaPagamento === 'cartao'
+  const exigeContaBanco = form.formaPagamento === 'pix' || form.formaPagamento === 'cartao' || form.formaPagamento === 'cheque'
 
   const modalidadeSelecionada = useMemo(() => {
     if (form.formaPagamento !== 'cartao' || !form.modalidadeCartao) return null
@@ -92,7 +92,7 @@ export default function Vendas() {
     const valor = parseCurrencyFromInput(form.valor)
     if (!form.descricao.trim() || valor <= 0) return
     if (exigeContaBanco && !form.contaBancoId) {
-      alert('Selecione a conta banco que recebeu o pagamento (PIX e cartão).')
+      alert('Selecione a conta banco que recebeu o pagamento.')
       return
     }
     if (form.formaPagamento === 'cartao') {
@@ -168,7 +168,7 @@ export default function Vendas() {
   const totalGeral = vendas.reduce((s, v) => s + v.valor, 0)
 
   const labelForma = (f: FormaPagamentoVenda) =>
-    f === 'pix' ? 'PIX' : f === 'dinheiro' ? 'Dinheiro' : 'Cartão'
+    f === 'pix' ? 'PIX' : f === 'dinheiro' ? 'Dinheiro' : f === 'cheque' ? 'Cheque' : 'Cartão'
 
   const labelFormaVenda = (v: Venda) => {
     if (v.formaPagamento === 'cartao') {
@@ -182,8 +182,8 @@ export default function Vendas() {
     <>
       <h1 className="page-title">Controle de Vendas</h1>
       <p style={{ color: 'var(--text-muted)', marginBottom: 20 }}>
-        Registre vendas com a forma de pagamento: <strong>PIX</strong>, <strong>Dinheiro</strong> ou <strong>Cartão</strong>.
-        Vendas em PIX e cartão podem ser vinculadas a uma conta banco. Para cartão, o valor líquido (após taxa da operadora) é lançado no financeiro.
+        Registre vendas com a forma de pagamento: <strong>PIX</strong>, <strong>Dinheiro</strong>, <strong>Cartão</strong> ou <strong>Cheque</strong>.
+        Vendas em PIX, cartão e cheque são vinculadas a uma conta banco. Para cartão, o valor líquido (após taxa da operadora) é lançado no financeiro.
       </p>
       <div style={{ marginBottom: 20 }}>
         <button type="button" className="btn btn-primary" onClick={openNew}>
@@ -212,7 +212,7 @@ export default function Vendas() {
               <th>Descrição</th>
               <th>Valor</th>
               <th>Forma de pagamento</th>
-              <th>Conta (PIX/Cartão)</th>
+              <th>Conta banco</th>
               <th></th>
             </tr>
           </thead>
@@ -292,6 +292,7 @@ export default function Vendas() {
                   <option value="pix">PIX</option>
                   <option value="dinheiro">Dinheiro</option>
                   <option value="cartao">Cartão</option>
+                  <option value="cheque">Cheque</option>
                 </select>
               </div>
               {form.formaPagamento === 'cartao' && (
