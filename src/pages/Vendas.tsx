@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import type { Venda, FormaPagamentoVenda } from '../types'
-import { storageVendas, storageContas, registrarVenda, atualizarVenda, excluirVenda } from '../services/storage'
+import { vendasGateway } from '../services/vendasGateway'
+import { contasBancoGateway } from '../services/contasBancoGateway'
 import { applyCurrencyMask, parseCurrencyFromInput, formatCurrencyForInput } from '../utils/currencyMask'
 import { formatDateBR, parseDateOnly } from '../utils/date'
 import { maquinasCartaoGateway } from '../services/maquinasCartaoGateway'
@@ -21,16 +22,17 @@ const emptyForm = {
 
 export default function Vendas() {
   const [vendas, setVendas] = useState<Venda[]>([])
-  const [contas, setContas] = useState(storageContas.getAll().filter((c) => c.ativo))
+  const [contas, setContas] = useState<{ id: string; nome: string; banco: string; ativo: boolean }[]>([])
   const [maquinas, setMaquinas] = useState<{ id: string; nome: string }[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [taxaConfigurada, setTaxaConfigurada] = useState<{ taxaPercentual: number } | null>(null)
 
-  const load = () => {
-    setVendas(storageVendas.getAll())
-    setContas(storageContas.getAll().filter((c) => c.ativo))
+  const load = async () => {
+    const [v, c] = await Promise.all([vendasGateway.getAll(), contasBancoGateway.getAll()])
+    setVendas(v)
+    setContas(c.filter((x) => x.ativo).map((x) => ({ id: x.id, nome: x.nome, banco: x.banco, ativo: x.ativo })))
     maquinasCartaoGateway.list(true).then((m) => setMaquinas(m.map((x) => ({ id: x.id, nome: x.nome }))))
   }
 
@@ -87,7 +89,7 @@ export default function Vendas() {
     setModalOpen(true)
   }
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     const valor = parseCurrencyFromInput(form.valor)
     if (!form.descricao.trim() || valor <= 0) return
@@ -109,8 +111,9 @@ export default function Vendas() {
         return
       }
     }
-    const data = editingId ? (storageVendas.getById(editingId)?.data ?? new Date().toISOString().slice(0, 10)) : new Date().toISOString().slice(0, 10)
-    const criadoEm = editingId ? (storageVendas.getById(editingId)?.criadoEm ?? new Date().toISOString()) : new Date().toISOString()
+    const existing = editingId ? vendas.find((v) => v.id === editingId) : null
+    const data = existing?.data ?? new Date().toISOString().slice(0, 10)
+    const criadoEm = existing?.criadoEm ?? new Date().toISOString()
 
     let venda: Venda
     if (form.formaPagamento === 'cartao' && form.maquinaCartaoId && modalidadeSelecionada && taxaConfigurada) {
@@ -145,9 +148,9 @@ export default function Vendas() {
       }
     }
     if (editingId) {
-      atualizarVenda(venda)
+      await vendasGateway.atualizar(venda)
     } else {
-      registrarVenda(venda)
+      await vendasGateway.registrar(venda)
     }
     setForm(emptyForm)
     setEditingId(null)
@@ -155,9 +158,9 @@ export default function Vendas() {
     load()
   }
 
-  const remove = (id: string) => {
+  const remove = async (id: string) => {
     if (!confirm('Excluir esta venda?')) return
-    excluirVenda(id)
+    await vendasGateway.excluir(id)
     load()
   }
 
