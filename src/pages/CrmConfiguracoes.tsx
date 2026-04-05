@@ -41,7 +41,8 @@ export default function CrmConfiguracoes() {
     setWhatsappForm((prev) => ({ ...prev, config: { ...prev.config, [key]: value } }))
   }
 
-  const webhookUrl = useMemo(() => `http://localhost:4000/api/webhooks/whatsapp/${whatsappForm.providerType}`, [whatsappForm.providerType])
+  const CRM_API_BASE = (import.meta.env.VITE_CRM_API_URL as string | undefined)?.trim() || 'http://localhost:4000'
+  const webhookUrl = useMemo(() => `${CRM_API_BASE}/api/webhooks/whatsapp/${whatsappForm.providerType}`, [CRM_API_BASE, whatsappForm.providerType])
 
   async function loadInitial() {
     setLoading(true)

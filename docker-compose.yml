@@ -34,12 +34,22 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3333/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
 
   web:
     build:
       context: .
       dockerfile: Dockerfile.web
       args:
+        # IMPORTANTE para VPS/produção: defina VITE_API_BASE_URL como a URL pública do servidor
+        # Ex: VITE_API_BASE_URL=http://IP_DO_VPS  ou  https://seu-dominio.com
+        # O nginx já faz proxy de /api/ para a API interna — basta apontar para a origem pública.
+        # Para desenvolvimento local (localhost), o default abaixo funciona normalmente.
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3333}
         VITE_CRM_API_URL: ${VITE_CRM_API_URL:-http://localhost:4000}
         VITE_ADMIN_LOGIN: ${VITE_ADMIN_LOGIN:-DumarrecoAdmin}
@@ -47,7 +57,8 @@ services:
     container_name: dumarreco_web
     restart: unless-stopped
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
       - "${WEB_PORT:-80}:80"
 
