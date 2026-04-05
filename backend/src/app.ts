@@ -10,6 +10,7 @@ import { vendasRouter } from './modules/vendas/routes'
 import { faturamentoMensalRouter } from './modules/faturamento-mensal/routes'
 import { despesasRouter } from './modules/despesas/routes'
 import { migrationRouter } from './modules/migration/routes'
+import { authRouter } from './modules/auth/routes'
 
 export function createApp() {
   const app = express()
@@ -29,6 +30,7 @@ export function createApp() {
   app.use('/api/faturamento-mensal', faturamentoMensalRouter)
   app.use('/api/despesas', despesasRouter)
   app.use('/api/migration', migrationRouter)
+  app.use('/api/auth', authRouter)
 
   app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const message = err instanceof Error ? err.message : 'Erro interno.'

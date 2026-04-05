@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { clearSessao, getSessao, setSessao, validarLogin } from '../services/authStorage'
+import { clearSessao, getSessao, setSessao } from '../services/authStorage'
+import { authGateway } from '../services/authGateway'
 
 interface AuthContextValue {
   isAuthenticated: boolean
@@ -15,7 +16,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuarioAtual, setUsuarioAtual] = useState<string | null>(() => getSessao())
 
   const login = useCallback(async (login: string, senha: string): Promise<boolean> => {
-    const usuario = await validarLogin(login, senha)
+    const usuario = await authGateway.login(login, senha)
     if (!usuario) return false
     setSessao(usuario.login)
     setUsuarioAtual(usuario.login)

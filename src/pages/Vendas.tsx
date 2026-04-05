@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import type { Venda, FormaPagamentoVenda, ContaBanco } from '../types'
-import { vendasGateway } from '../services/vendasGateway'
-import { contasBancoGateway } from '../services/contasBancoGateway'
+import type { Venda, FormaPagamentoVenda } from '../types'
+import { storageVendas, storageContas, registrarVenda, atualizarVenda, excluirVenda } from '../services/storage'
 import { applyCurrencyMask, parseCurrencyFromInput, formatCurrencyForInput } from '../utils/currencyMask'
 import { formatDateBR, parseDateOnly } from '../utils/date'
 import { maquinasCartaoGateway } from '../services/maquinasCartaoGateway'
@@ -9,7 +8,7 @@ import { calcularValorLiquidoCartao } from '../services/taxaCartaoService'
 import { formatMoney } from '../utils/formatMoney'
 import { MODALIDADES_CARTAO } from '../utils/constants'
 
-const FORMAS: FormaPagamentoVenda[] = ['pix', 'dinheiro', 'cartao', 'cheque']
+const FORMAS: FormaPagamentoVenda[] = ['pix', 'dinheiro', 'cartao']
 
 const emptyForm = {
   descricao: '',
@@ -22,28 +21,24 @@ const emptyForm = {
 
 export default function Vendas() {
   const [vendas, setVendas] = useState<Venda[]>([])
-  const [contas, setContas] = useState<ContaBanco[]>([])
+  const [contas, setContas] = useState(storageContas.getAll().filter((c) => c.ativo))
   const [maquinas, setMaquinas] = useState<{ id: string; nome: string }[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [taxaConfigurada, setTaxaConfigurada] = useState<{ taxaPercentual: number } | null>(null)
 
-  const load = async () => {
-    const [vendasList, contasList] = await Promise.all([
-      vendasGateway.getAll(),
-      contasBancoGateway.getAll(),
-    ])
-    setVendas(vendasList)
-    setContas(contasList.filter((c) => c.ativo))
+  const load = () => {
+    setVendas(storageVendas.getAll())
+    setContas(storageContas.getAll().filter((c) => c.ativo))
     maquinasCartaoGateway.list(true).then((m) => setMaquinas(m.map((x) => ({ id: x.id, nome: x.nome }))))
   }
 
   useEffect(() => {
-    void load()
+    load()
   }, [])
 
-  const exigeContaBanco = form.formaPagamento === 'pix' || form.formaPagamento === 'cartao' || form.formaPagamento === 'cheque'
+  const exigeContaBanco = form.formaPagamento === 'pix' || form.formaPagamento === 'cartao'
 
   const modalidadeSelecionada = useMemo(() => {
     if (form.formaPagamento !== 'cartao' || !form.modalidadeCartao) return null
@@ -92,12 +87,12 @@ export default function Vendas() {
     setModalOpen(true)
   }
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault()
     const valor = parseCurrencyFromInput(form.valor)
     if (!form.descricao.trim() || valor <= 0) return
     if (exigeContaBanco && !form.contaBancoId) {
-      alert('Selecione a conta banco que recebeu o pagamento (PIX, cartão e cheque).')
+      alert('Selecione a conta banco que recebeu o pagamento (PIX e cartão).')
       return
     }
     if (form.formaPagamento === 'cartao') {
@@ -114,9 +109,8 @@ export default function Vendas() {
         return
       }
     }
-    const existing = editingId ? await vendasGateway.getById(editingId) : undefined
-    const data = editingId ? (existing?.data ?? new Date().toISOString().slice(0, 10)) : new Date().toISOString().slice(0, 10)
-    const criadoEm = editingId ? (existing?.criadoEm ?? new Date().toISOString()) : new Date().toISOString()
+    const data = editingId ? (storageVendas.getById(editingId)?.data ?? new Date().toISOString().slice(0, 10)) : new Date().toISOString().slice(0, 10)
+    const criadoEm = editingId ? (storageVendas.getById(editingId)?.criadoEm ?? new Date().toISOString()) : new Date().toISOString()
 
     let venda: Venda
     if (form.formaPagamento === 'cartao' && form.maquinaCartaoId && modalidadeSelecionada && taxaConfigurada) {
@@ -151,20 +145,20 @@ export default function Vendas() {
       }
     }
     if (editingId) {
-      await vendasGateway.atualizar(venda)
+      atualizarVenda(venda)
     } else {
-      await vendasGateway.registrar(venda)
+      registrarVenda(venda)
     }
     setForm(emptyForm)
     setEditingId(null)
     setModalOpen(false)
-    void load()
+    load()
   }
 
-  const remove = async (id: string) => {
+  const remove = (id: string) => {
     if (!confirm('Excluir esta venda?')) return
-    await vendasGateway.excluir(id)
-    void load()
+    excluirVenda(id)
+    load()
   }
 
   const totaisPorForma = FORMAS.reduce((acc, forma) => {
@@ -174,14 +168,13 @@ export default function Vendas() {
   const totalGeral = vendas.reduce((s, v) => s + v.valor, 0)
 
   const labelForma = (f: FormaPagamentoVenda) =>
-    f === 'pix' ? 'PIX' : f === 'dinheiro' ? 'Dinheiro' : f === 'cheque' ? 'Cheque' : 'Cartão'
+    f === 'pix' ? 'PIX' : f === 'dinheiro' ? 'Dinheiro' : 'Cartão'
 
   const labelFormaVenda = (v: Venda) => {
     if (v.formaPagamento === 'cartao') {
       if (v.tipoPagamentoCartao === 'debito') return 'Cartão Débito'
       return `Cartão Crédito ${v.quantidadeParcelas ?? 1}x`
     }
-    if (v.formaPagamento === 'cheque') return 'Cheque'
     return labelForma(v.formaPagamento)
   }
 
@@ -189,8 +182,8 @@ export default function Vendas() {
     <>
       <h1 className="page-title">Controle de Vendas</h1>
       <p style={{ color: 'var(--text-muted)', marginBottom: 20 }}>
-        Registre vendas com a forma de pagamento: <strong>PIX</strong>, <strong>Dinheiro</strong>, <strong>Cartão</strong> ou <strong>Cheque</strong>.
-        Vendas em PIX, cartão e cheque podem ser vinculadas a uma conta banco. Para cartão, o valor líquido (após taxa da operadora) é lançado no financeiro.
+        Registre vendas com a forma de pagamento: <strong>PIX</strong>, <strong>Dinheiro</strong> ou <strong>Cartão</strong>.
+        Vendas em PIX e cartão podem ser vinculadas a uma conta banco. Para cartão, o valor líquido (após taxa da operadora) é lançado no financeiro.
       </p>
       <div style={{ marginBottom: 20 }}>
         <button type="button" className="btn btn-primary" onClick={openNew}>
@@ -219,7 +212,7 @@ export default function Vendas() {
               <th>Descrição</th>
               <th>Valor</th>
               <th>Forma de pagamento</th>
-              <th>Conta (PIX/Cartão/Cheque)</th>
+              <th>Conta (PIX/Cartão)</th>
               <th></th>
             </tr>
           </thead>
@@ -299,7 +292,6 @@ export default function Vendas() {
                   <option value="pix">PIX</option>
                   <option value="dinheiro">Dinheiro</option>
                   <option value="cartao">Cartão</option>
-                  <option value="cheque">Cheque</option>
                 </select>
               </div>
               {form.formaPagamento === 'cartao' && (

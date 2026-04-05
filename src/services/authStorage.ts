@@ -5,7 +5,7 @@ export interface Usuario {
   root: boolean
 }
 
-async function hashSenha(senha: string): Promise<string> {
+export async function hashSenha(senha: string): Promise<string> {
   const data = new TextEncoder().encode(senha)
   const buf = await crypto.subtle.digest('SHA-256', data)
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('')
