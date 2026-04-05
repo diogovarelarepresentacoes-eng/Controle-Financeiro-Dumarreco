@@ -141,33 +141,38 @@ export const despesasService = {
     if (!despesa) throw new Error('Despesa nao encontrada.')
 
     const data = dataPagamento ?? new Date().toISOString().slice(0, 10)
-    const updated = await prisma.despesa.update({
-      where: { id },
-      data: {
-        status: 'pago',
-        dataPagamento: data,
-        origemPagamento,
-        contaBancoId: contaBancoId ?? null,
-      },
-    })
 
-    if (origemPagamento === 'conta_banco' && contaBancoId) {
-      await prisma.movimentacaoBancaria.create({
+    const updated = await prisma.$transaction(async (tx) => {
+      const updatedDespesa = await tx.despesa.update({
+        where: { id },
         data: {
-          id: crypto.randomUUID(),
-          contaBancoId,
-          tipo: 'saida',
-          valor: despesa.valor,
-          descricao: `Despesa: ${despesa.descricao}`,
-          despesaId: id,
-          data,
+          status: 'pago',
+          dataPagamento: data,
+          origemPagamento,
+          contaBancoId: contaBancoId ?? null,
         },
       })
-      await prisma.contaBanco.update({
-        where: { id: contaBancoId },
-        data: { saldoAtual: { decrement: despesa.valor } },
-      })
-    }
+
+      if (origemPagamento === 'conta_banco' && contaBancoId) {
+        await tx.movimentacaoBancaria.create({
+          data: {
+            id: crypto.randomUUID(),
+            contaBancoId,
+            tipo: 'saida',
+            valor: despesa.valor,
+            descricao: `Despesa: ${despesa.descricao}`,
+            despesaId: id,
+            data,
+          },
+        })
+        await tx.contaBanco.update({
+          where: { id: contaBancoId },
+          data: { saldoAtual: { decrement: despesa.valor } },
+        })
+      }
+
+      return updatedDespesa
+    })
 
     return toJson(updated)
   },
@@ -176,34 +181,39 @@ export const despesasService = {
     const despesa = await prisma.despesa.findUnique({ where: { id } })
     if (!despesa) throw new Error('Despesa nao encontrada.')
 
-    if (despesa.origemPagamento === 'conta_banco' && despesa.contaBancoId) {
-      const movs = await prisma.movimentacaoBancaria.findMany({ where: { despesaId: id } })
-      for (const m of movs) {
-        await prisma.contaBanco.update({
-          where: { id: m.contaBancoId },
-          data: { saldoAtual: { increment: m.valor } },
-        })
+    const updated = await prisma.$transaction(async (tx) => {
+      if (despesa.origemPagamento === 'conta_banco' && despesa.contaBancoId) {
+        const movs = await tx.movimentacaoBancaria.findMany({ where: { despesaId: id } })
+        for (const m of movs) {
+          await tx.contaBanco.update({
+            where: { id: m.contaBancoId },
+            data: { saldoAtual: { increment: m.valor } },
+          })
+        }
+        await tx.movimentacaoBancaria.deleteMany({ where: { despesaId: id } })
       }
-      await prisma.movimentacaoBancaria.deleteMany({ where: { despesaId: id } })
-    }
 
-    const updated = await prisma.despesa.update({
-      where: { id },
-      data: {
-        status: 'pendente',
-        dataPagamento: null,
-        origemPagamento: null,
-        contaBancoId: null,
-      },
+      return tx.despesa.update({
+        where: { id },
+        data: {
+          status: 'pendente',
+          dataPagamento: null,
+          origemPagamento: null,
+          contaBancoId: null,
+        },
+      })
     })
+
     return toJson(updated)
   },
 
   async delete(id: string) {
     const existing = await prisma.despesa.findUnique({ where: { id } })
     if (!existing) throw new Error('Despesa nao encontrada.')
-    await prisma.movimentacaoBancaria.deleteMany({ where: { despesaId: id } })
-    await prisma.despesa.delete({ where: { id } })
+    await prisma.$transaction([
+      prisma.movimentacaoBancaria.deleteMany({ where: { despesaId: id } }),
+      prisma.despesa.delete({ where: { id } }),
+    ])
   },
 
   // Deleted recurrence markers

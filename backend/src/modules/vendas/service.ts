@@ -51,10 +51,10 @@ function precisaMovimentacao(formaPagamento: string): boolean {
   return formaPagamento === 'pix' || formaPagamento === 'cartao' || formaPagamento === 'cheque'
 }
 
-async function criarMovimentacaoVenda(venda: CreateInput, vendaId: string) {
+async function criarMovimentacaoVenda(venda: CreateInput, vendaId: string, tx: typeof prisma) {
   if (!precisaMovimentacao(venda.formaPagamento) || !venda.contaBancoId) return
   const valor = valorParaMovimentacao(venda)
-  await prisma.movimentacaoBancaria.create({
+  await tx.movimentacaoBancaria.create({
     data: {
       id: crypto.randomUUID(),
       contaBancoId: venda.contaBancoId,
@@ -65,21 +65,21 @@ async function criarMovimentacaoVenda(venda: CreateInput, vendaId: string) {
       data: venda.data,
     },
   })
-  await prisma.contaBanco.update({
+  await tx.contaBanco.update({
     where: { id: venda.contaBancoId },
     data: { saldoAtual: { increment: valor } },
   })
 }
 
-async function reverterMovimentacoesVenda(vendaId: string) {
-  const movs = await prisma.movimentacaoBancaria.findMany({ where: { vendaId } })
+async function reverterMovimentacoesVenda(vendaId: string, tx: typeof prisma) {
+  const movs = await tx.movimentacaoBancaria.findMany({ where: { vendaId } })
   for (const m of movs) {
-    await prisma.contaBanco.update({
+    await tx.contaBanco.update({
       where: { id: m.contaBancoId },
       data: { saldoAtual: { decrement: m.valor } },
     })
   }
-  await prisma.movimentacaoBancaria.deleteMany({ where: { vendaId } })
+  await tx.movimentacaoBancaria.deleteMany({ where: { vendaId } })
 }
 
 export const vendasService = {
@@ -95,26 +95,29 @@ export const vendasService = {
 
   async registrar(input: CreateInput) {
     const vendaId = input.id ?? crypto.randomUUID()
-    const venda = await prisma.venda.create({
-      data: {
-        id: vendaId,
-        descricao: input.descricao,
-        valor: input.valor,
-        formaPagamento: input.formaPagamento,
-        contaBancoId: input.contaBancoId ?? null,
-        data: input.data,
-        maquinaCartaoId: input.maquinaCartaoId ?? null,
-        maquinaCartaoNome: input.maquinaCartaoNome ?? null,
-        tipoPagamentoCartao: input.tipoPagamentoCartao ?? null,
-        quantidadeParcelas: input.quantidadeParcelas ?? null,
-        valorBruto: input.valorBruto ?? null,
-        taxaPercentualCartao: input.taxaPercentualCartao ?? null,
-        valorTaxaCartao: input.valorTaxaCartao ?? null,
-        valorLiquido: input.valorLiquido ?? null,
-        observacaoFinanceira: input.observacaoFinanceira ?? null,
-      },
+    const venda = await prisma.$transaction(async (tx) => {
+      const created = await tx.venda.create({
+        data: {
+          id: vendaId,
+          descricao: input.descricao,
+          valor: input.valor,
+          formaPagamento: input.formaPagamento,
+          contaBancoId: input.contaBancoId ?? null,
+          data: input.data,
+          maquinaCartaoId: input.maquinaCartaoId ?? null,
+          maquinaCartaoNome: input.maquinaCartaoNome ?? null,
+          tipoPagamentoCartao: input.tipoPagamentoCartao ?? null,
+          quantidadeParcelas: input.quantidadeParcelas ?? null,
+          valorBruto: input.valorBruto ?? null,
+          taxaPercentualCartao: input.taxaPercentualCartao ?? null,
+          valorTaxaCartao: input.valorTaxaCartao ?? null,
+          valorLiquido: input.valorLiquido ?? null,
+          observacaoFinanceira: input.observacaoFinanceira ?? null,
+        },
+      })
+      await criarMovimentacaoVenda(input, vendaId, tx as unknown as typeof prisma)
+      return created
     })
-    await criarMovimentacaoVenda(input, vendaId)
     return toJson(venda)
   },
 
@@ -122,39 +125,44 @@ export const vendasService = {
     const antiga = await prisma.venda.findUnique({ where: { id } })
     if (!antiga) throw new Error('Venda nao encontrada.')
 
-    if (precisaMovimentacao(antiga.formaPagamento as string) && antiga.contaBancoId) {
-      await reverterMovimentacoesVenda(id)
-    }
+    const venda = await prisma.$transaction(async (tx) => {
+      if (precisaMovimentacao(antiga.formaPagamento as string) && antiga.contaBancoId) {
+        await reverterMovimentacoesVenda(id, tx as unknown as typeof prisma)
+      }
 
-    const venda = await prisma.venda.update({
-      where: { id },
-      data: {
-        descricao: input.descricao,
-        valor: input.valor,
-        formaPagamento: input.formaPagamento,
-        contaBancoId: input.contaBancoId ?? null,
-        data: input.data,
-        maquinaCartaoId: input.maquinaCartaoId ?? null,
-        maquinaCartaoNome: input.maquinaCartaoNome ?? null,
-        tipoPagamentoCartao: input.tipoPagamentoCartao ?? null,
-        quantidadeParcelas: input.quantidadeParcelas ?? null,
-        valorBruto: input.valorBruto ?? null,
-        taxaPercentualCartao: input.taxaPercentualCartao ?? null,
-        valorTaxaCartao: input.valorTaxaCartao ?? null,
-        valorLiquido: input.valorLiquido ?? null,
-        observacaoFinanceira: input.observacaoFinanceira ?? null,
-      },
+      const updated = await tx.venda.update({
+        where: { id },
+        data: {
+          descricao: input.descricao,
+          valor: input.valor,
+          formaPagamento: input.formaPagamento,
+          contaBancoId: input.contaBancoId ?? null,
+          data: input.data,
+          maquinaCartaoId: input.maquinaCartaoId ?? null,
+          maquinaCartaoNome: input.maquinaCartaoNome ?? null,
+          tipoPagamentoCartao: input.tipoPagamentoCartao ?? null,
+          quantidadeParcelas: input.quantidadeParcelas ?? null,
+          valorBruto: input.valorBruto ?? null,
+          taxaPercentualCartao: input.taxaPercentualCartao ?? null,
+          valorTaxaCartao: input.valorTaxaCartao ?? null,
+          valorLiquido: input.valorLiquido ?? null,
+          observacaoFinanceira: input.observacaoFinanceira ?? null,
+        },
+      })
+      await criarMovimentacaoVenda(input, id, tx as unknown as typeof prisma)
+      return updated
     })
-    await criarMovimentacaoVenda(input, id)
     return toJson(venda)
   },
 
   async excluir(id: string) {
     const existente = await prisma.venda.findUnique({ where: { id } })
     if (!existente) throw new Error('Venda nao encontrada.')
-    if (precisaMovimentacao(existente.formaPagamento) && existente.contaBancoId) {
-      await reverterMovimentacoesVenda(id)
-    }
-    await prisma.venda.delete({ where: { id } })
+    await prisma.$transaction(async (tx) => {
+      if (precisaMovimentacao(existente.formaPagamento) && existente.contaBancoId) {
+        await reverterMovimentacoesVenda(id, tx as unknown as typeof prisma)
+      }
+      await tx.venda.delete({ where: { id } })
+    })
   },
 }
