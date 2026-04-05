@@ -1,13 +1,7 @@
 import { useState, useEffect } from 'react'
 import { zerarBancoDeDados, storageContas, storageBoletos, storageMovimentacoes, storageVendas, storageFaturamentoMensal } from '../services/storage'
 import { despesasRepository } from '../modules/despesas/repository'
-import {
-  getUsuarios,
-  salvarUsuario,
-  excluirUsuario,
-  alterarSenha,
-  type Usuario,
-} from '../services/authStorage'
+import { authGateway } from '../services/authGateway'
 
 function exportarDadosLocais() {
   const dados = {
@@ -35,7 +29,7 @@ function exportarDadosLocais() {
 export default function Configuracoes() {
   const [confirmando, setConfirmando] = useState(false)
 
-  const [usuarios, setUsuarios] = useState<Usuario[]>([])
+  const [usuarios, setUsuarios] = useState<{ id: string; login: string; root: boolean }[]>([])
   const [novoLogin, setNovoLogin] = useState('')
   const [novaSenha, setNovaSenha] = useState('')
   const [erroNovo, setErroNovo] = useState('')
@@ -44,7 +38,7 @@ export default function Configuracoes() {
   const [senhaAlterada, setSenhaAlterada] = useState('')
   const [erroAlteracao, setErroAlteracao] = useState('')
 
-  const recarregar = () => { getUsuarios().then(setUsuarios) }
+  const recarregar = () => { authGateway.getUsuarios().then(setUsuarios) }
 
   useEffect(() => { recarregar() }, [])
 
@@ -60,14 +54,14 @@ export default function Configuracoes() {
     if (!novaSenha) { setErroNovo('Informe uma senha.'); return }
     const loginExiste = usuarios.some((u) => u.login.toLowerCase() === novoLogin.trim().toLowerCase())
     if (loginExiste) { setErroNovo('Já existe um usuário com este login.'); return }
-    await salvarUsuario({ login: novoLogin, senha: novaSenha })
+    await authGateway.salvarUsuario(novoLogin, novaSenha)
     setNovoLogin('')
     setNovaSenha('')
     recarregar()
   }
 
   async function handleExcluir(id: string) {
-    await excluirUsuario(id)
+    await authGateway.excluirUsuario(id)
     recarregar()
   }
 
@@ -76,7 +70,7 @@ export default function Configuracoes() {
     setErroAlteracao('')
     if (!senhaAlterada) { setErroAlteracao('Informe a nova senha.'); return }
     if (alterandoSenhaId) {
-      await alterarSenha(alterandoSenhaId, senhaAlterada)
+      await authGateway.alterarSenha(alterandoSenhaId, senhaAlterada)
       setAlterandoSenhaId(null)
       setSenhaAlterada('')
       recarregar()
