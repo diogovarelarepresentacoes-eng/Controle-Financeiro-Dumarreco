@@ -23,7 +23,13 @@ export default function ContaBanco() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
 
-  const load = async () => setContas(await contasBancoGateway.getAll())
+  const load = async () => {
+    try {
+      setContas(await contasBancoGateway.getAll())
+    } catch {
+      setContas([])
+    }
+  }
 
   useEffect(() => {
     load()
@@ -65,25 +71,29 @@ export default function ContaBanco() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     const agora = new Date().toISOString()
-    if (editingId) {
-      const existente = contas.find((c) => c.id === editingId)!
-      await contasBancoGateway.save({
-        ...existente,
-        ...form,
-        saldoAtual: existente.saldoAtual,
-      })
-    } else {
-      const saldoInicial = parseCurrencyFromInput(saldoInicialDisplay)
-      await contasBancoGateway.save({
-        id: crypto.randomUUID(),
-        ...form,
-        saldoInicial,
-        saldoAtual: saldoInicial,
-        criadoEm: agora,
-      })
+    try {
+      if (editingId) {
+        const existente = contas.find((c) => c.id === editingId)!
+        await contasBancoGateway.save({
+          ...existente,
+          ...form,
+          saldoAtual: existente.saldoAtual,
+        })
+      } else {
+        const saldoInicial = parseCurrencyFromInput(saldoInicialDisplay)
+        await contasBancoGateway.save({
+          id: crypto.randomUUID(),
+          ...form,
+          saldoInicial,
+          saldoAtual: saldoInicial,
+          criadoEm: agora,
+        })
+      }
+      setModalOpen(false)
+      load()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erro ao salvar conta bancaria.')
     }
-    setModalOpen(false)
-    load()
   }
 
   const remove = async (id: string) => {

@@ -92,7 +92,11 @@ export default function Despesas() {
       busca: filtroBusca,
     })
     setDespesas(list)
-    setContas((await contasBancoGateway.getAll()).filter((c) => c.ativo))
+    try {
+      setContas((await contasBancoGateway.getAll()).filter((c) => c.ativo))
+    } catch {
+      setContas([])
+    }
   }
 
   useEffect(() => {
