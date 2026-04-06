@@ -1,4 +1,5 @@
-import { lazy, Suspense } from 'react'
+import { Component, lazy, Suspense } from 'react'
+import type { ErrorInfo, ReactNode } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ROTA_DESPESAS } from './modules/despesas/routes'
@@ -6,7 +7,6 @@ import { ROTA_COMPRAS } from './modules/compras/routes'
 import { AppLayout } from './components/layout/AppLayout'
 import { ROTA_CRM_ATENDIMENTO, ROTA_CRM_CONFIG, ROTA_CRM_INBOX, ROTA_CRM_KANBAN, ROTA_CRM_METAS } from './modules/crm/routes'
 import { useAuth } from './context/AuthContext'
-import type { ReactNode } from 'react'
 
 const Login = lazy(() => import('./pages/Login'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
@@ -29,6 +29,43 @@ const CrmAtendimento = lazy(() => import('./pages/CrmAtendimento'))
 const CrmKanban = lazy(() => import('./pages/CrmKanban'))
 const CrmMetas = lazy(() => import('./pages/CrmMetas'))
 const CrmConfiguracoes = lazy(() => import('./pages/CrmConfiguracoes'))
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; message: string }> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { hasError: false, message: '' }
+  }
+
+  static getDerivedStateFromError(error: unknown) {
+    const message = error instanceof Error ? error.message : 'Erro inesperado.'
+    return { hasError: true, message }
+  }
+
+  componentDidCatch(_error: unknown, _info: ErrorInfo) {
+    // Silencioso — o estado já foi atualizado em getDerivedStateFromError
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 40, textAlign: 'center' }}>
+          <h2 style={{ color: 'var(--danger, #e53e3e)', marginBottom: 12 }}>Erro ao carregar a pagina</h2>
+          <p style={{ color: 'var(--text-muted, #666)', marginBottom: 24 }}>{this.state.message}</p>
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              this.setState({ hasError: false, message: '' })
+              window.location.reload()
+            }}
+          >
+            Recarregar
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth()
@@ -55,6 +92,7 @@ function App() {
                     exit={{ opacity: 0, y: -8 }}
                     transition={{ duration: 0.2 }}
                   >
+                    <ErrorBoundary>
                     <Suspense fallback={null}>
                       <Routes location={location}>
                         <Route path="/" element={<Dashboard />} />
@@ -81,6 +119,7 @@ function App() {
                         <Route path={ROTA_CRM_CONFIG} element={<CrmConfiguracoes />} />
                       </Routes>
                     </Suspense>
+                    </ErrorBoundary>
                   </motion.div>
                 </AnimatePresence>
               </AppLayout>

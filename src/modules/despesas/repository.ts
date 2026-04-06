@@ -19,7 +19,11 @@ function getRaw(): Despesa[] {
 }
 
 function saveRaw(list: Despesa[]): void {
-  localStorage.setItem(KEY_DESPESAS, JSON.stringify(list))
+  try {
+    localStorage.setItem(KEY_DESPESAS, JSON.stringify(list))
+  } catch {
+    // Ignora erros de quota ou acesso ao localStorage
+  }
 }
 
 function getDeletedRecurrencesRaw(): DeletedRecurrenceMarker[] {
@@ -32,7 +36,11 @@ function getDeletedRecurrencesRaw(): DeletedRecurrenceMarker[] {
 }
 
 function saveDeletedRecurrencesRaw(list: DeletedRecurrenceMarker[]): void {
-  localStorage.setItem(KEY_DESPESAS_DELETED_RECURRENCES, JSON.stringify(list))
+  try {
+    localStorage.setItem(KEY_DESPESAS_DELETED_RECURRENCES, JSON.stringify(list))
+  } catch {
+    // Ignora erros de quota ou acesso ao localStorage
+  }
 }
 
 function seedExemplos(): Despesa[] {
