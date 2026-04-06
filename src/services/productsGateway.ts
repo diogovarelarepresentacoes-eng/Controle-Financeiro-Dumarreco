@@ -1,6 +1,4 @@
-const API_BASE_RAW = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
-const API_BASE = API_BASE_RAW || 'http://localhost:3333'
-const USING_BACKEND = Boolean(API_BASE)
+import { USING_BACKEND, API_BASE } from './apiHelper'
 
 export type Product = {
   id: string

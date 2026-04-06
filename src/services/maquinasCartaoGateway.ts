@@ -37,9 +37,7 @@ const TAXAS_PADRAO: Omit<TaxaMaquinaCartao, 'id' | 'maquinaCartaoId' | 'createdA
   { tipoCartao: 'credito', parcelas: 12, taxaPercentual: 8.49, ativo: true },
 ]
 
-const API_BASE_RAW = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
-const API_BASE = API_BASE_RAW || 'http://localhost:3333'
-const USING_BACKEND = Boolean(API_BASE_RAW)
+import { USING_BACKEND, API_BASE } from './apiHelper'
 
 interface LocalData {
   maquinas: MaquinaCartao[]

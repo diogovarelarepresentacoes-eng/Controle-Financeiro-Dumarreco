@@ -1,9 +1,7 @@
 import { comprasController } from '../modules/compras/controller'
 import type { CompraComRelacionamentos, FiltrosCompra, KpisCompras } from '../modules/compras/model'
 
-const API_BASE_RAW = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
-const API_BASE = API_BASE_RAW || 'http://localhost:3333'
-const USING_BACKEND = Boolean(API_BASE_RAW)
+import { USING_BACKEND, API_BASE } from './apiHelper'
 
 function toNumber(v: unknown): number {
   if (typeof v === 'number') return v
