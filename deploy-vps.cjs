@@ -1,8 +1,8 @@
 /**
- * Deploy na VPS: atualiza o repositório em /var/www/controle-financeiro e sobe os containers.
+ * Deploy na VPS: firewall (UFW), git pull, Docker, Let's Encrypt, recarga do nginx.
  *
- * Uso (PowerShell): $env:SSH_PASSWORD='sua_senha'; node deploy-vps.cjs
- * Uso (bash): SSH_PASSWORD='sua_senha' node deploy-vps.cjs
+ * Uso (PowerShell): $env:SSH_PASSWORD='...'; node deploy-vps.cjs
+ * Opcional: $env:CERTBOT_EMAIL='seu@email.com'
  */
 const { Client } = require('ssh2')
 
@@ -15,22 +15,40 @@ if (!password) {
 const host = process.env.SSH_HOST || '187.77.253.26'
 const port = Number(process.env.SSH_PORT || 22)
 const username = process.env.SSH_USER || 'root'
+const certEmail = process.env.CERTBOT_EMAIL || 'admin@dumarreco.tech'
+
+const remoteDir = '/var/www/controle-financeiro'
 
 const cmds = [
+  'echo "=== UFW (servidor) ==="',
+  'export DEBIAN_FRONTEND=noninteractive',
+  'command -v ufw >/dev/null || (apt-get update -qq && apt-get install -y -qq ufw)',
+  'ufw allow 22/tcp',
+  'ufw allow 80/tcp',
+  'ufw allow 443/tcp',
+  'ufw --force enable || true',
+  'ufw status numbered || true',
+  'echo "=== Painel Hostinger: em Segurança > Firewall, crie regras TCP 22, 80 e 443 se a rede bloquear ==="',
   'echo "=== Git pull ==="',
-  'cd /var/www/controle-financeiro && git pull origin main',
-  'echo "=== Stopping old containers ==="',
-  'docker stop dumarreco_web dumarreco_api dumarreco_db 2>/dev/null; docker rm dumarreco_web dumarreco_api dumarreco_db 2>/dev/null; echo "Old containers removed"',
-  'echo "=== Starting fresh containers ==="',
-  'cd /var/www/controle-financeiro && docker compose --env-file .env.docker up -d --build',
-  'echo "=== Waiting for DB healthy + API start (50s) ==="',
-  'sleep 50',
-  'echo "=== Container status ==="',
+  `cd ${remoteDir} && git pull origin main`,
+  'echo "=== Docker: rebuild ==="',
+  `cd ${remoteDir} && docker compose --env-file .env.docker up -d --build`,
+  'echo "=== Aguardando stack (30s) ==="',
+  'sleep 30',
+  `echo "=== Let Encrypt (email: ${certEmail}) ==="`,
+  `cd ${remoteDir} && docker compose --env-file .env.docker --profile cert run --rm certbot certonly --webroot -w /var/www/certbot -d dumarreco.tech --email ${certEmail} --agree-tos --non-interactive || echo "Certbot: verifique DNS, rate limit ou certificado já emitido."`,
+  `cd ${remoteDir} && docker compose --env-file .env.docker up -d --force-recreate web`,
+  'sleep 8',
+  'echo "=== Containers ==="',
   'docker ps --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}"',
-  'echo "=== API health check ==="',
-  'curl -s http://127.0.0.1:3333/health || echo "API not responding"',
-  'echo "=== API logs (last 30 lines) ==="',
-  'docker logs dumarreco_api --tail 30 2>&1',
+  'echo "=== API health ==="',
+  'curl -s http://127.0.0.1:3333/health || echo "API?"',
+  'echo "=== HTTP local ==="',
+  'curl -sI http://127.0.0.1/ | head -8',
+  'echo "=== HTTPS local (ignora certificado) ==="',
+  'curl -skI https://127.0.0.1/ | head -8 || echo "HTTPS ainda não (normal antes do cert)"',
+  'echo "=== API logs (tail) ==="',
+  'docker logs dumarreco_api --tail 20 2>&1',
 ]
 
 const c = new Client()
@@ -74,5 +92,5 @@ c.connect({
   username,
   password,
   tryKeyboard: true,
-  readyTimeout: 30000,
+  readyTimeout: 60000,
 })

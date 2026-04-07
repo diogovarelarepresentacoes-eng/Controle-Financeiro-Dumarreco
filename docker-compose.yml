@@ -49,9 +49,26 @@ services:
     restart: unless-stopped
     depends_on:
       - api
+    environment:
+      SSL_DOMAIN: ${SSL_DOMAIN:-dumarreco.tech}
     ports:
       - "${WEB_PORT:-80}:80"
+      - "${WEB_HTTPS_PORT:-443}:443"
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_conf:/etc/letsencrypt:ro
+
+  certbot:
+    image: certbot/certbot:v2.11.0
+    profiles: ["cert"]
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_conf:/etc/letsencrypt
 
 volumes:
   postgres_data:
     name: dumarreco_postgres_data
+  certbot_www:
+    name: dumarreco_certbot_www
+  certbot_conf:
+    name: dumarreco_certbot_conf
