@@ -64,18 +64,37 @@ echo "[5/7] Configurando variaveis de ambiente..."
 ENV_FILE="$PROJETO_DIR/.env.docker"
 
 if [ ! -f "$ENV_FILE" ]; then
+  DB_PASSWORD=$(openssl rand -base64 16 | tr -dc 'A-Za-z0-9' | head -c 20)
+
+  echo ""
+  echo "  Definindo credenciais do administrador..."
+  read -rp "  Login do admin [DumarrecoAdmin]: " ADMIN_LOGIN_INPUT
+  ADMIN_LOGIN_INPUT="${ADMIN_LOGIN_INPUT:-DumarrecoAdmin}"
+  read -rsp "  Senha do admin: " ADMIN_PASS_INPUT
+  echo ""
+  if [ -z "$ADMIN_PASS_INPUT" ]; then
+    ADMIN_PASS_INPUT=$(openssl rand -base64 12 | tr -dc 'A-Za-z0-9' | head -c 16)
+    echo "  Senha admin gerada automaticamente: $ADMIN_PASS_INPUT"
+    echo "  ANOTE ESTA SENHA — ela nao sera exibida novamente."
+  fi
+
   cat > "$ENV_FILE" <<ENVEOF
 POSTGRES_DB=controle_financeiro
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=Dumarreco2026!
+POSTGRES_PASSWORD=${DB_PASSWORD}
 POSTGRES_PORT=5432
 API_PORT=3333
 WEB_PORT=80
-VITE_API_BASE_URL=http://${IP_PUBLICO}:3333
+# VITE_API_BASE_URL vazio = frontend usa proxy reverso nginx (/api/...)
+# NAO defina um IP:porta aqui — isso quebraria o roteamento via nginx
+VITE_API_BASE_URL=
+VITE_USE_BACKEND=true
 VITE_CRM_API_URL=http://${IP_PUBLICO}:4000
+ADMIN_LOGIN=${ADMIN_LOGIN_INPUT}
+ADMIN_PASS=${ADMIN_PASS_INPUT}
 ENVEOF
   echo "  .env.docker criado."
-  echo "  IMPORTANTE: edite a senha do banco em $ENV_FILE se desejar outra."
+  echo "  IMPORTANTE: senha do banco e do admin foram definidas — guarde-as em lugar seguro."
 else
   echo "  .env.docker ja existe — mantendo o atual."
 fi
@@ -124,7 +143,7 @@ echo "  SETUP CONCLUIDO!"
 echo "============================================="
 echo ""
 echo "  Acesse o sistema: http://${IP_PUBLICO}"
-echo "  API:              http://${IP_PUBLICO}:3333"
+echo "  API (interna):    porta 3333 — acessivel via nginx em /api/ (nao precisa abrir no firewall)"
 echo "  Banco:            PostgreSQL na porta 5432"
 echo ""
 echo "  Arquivos:         $PROJETO_DIR"

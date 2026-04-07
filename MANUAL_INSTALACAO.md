@@ -141,20 +141,30 @@ Reconecte no SSH.
 ```bash
 git clone <URL_DO_REPOSITORIO>
 cd "Controle Financeiro Dumarreco"
-cp .env.docker.example .env
-docker compose up -d --build
+
+# Copiar e editar as variaveis de ambiente
+cp .env.docker.example .env.docker
+nano .env.docker   # Edite POSTGRES_PASSWORD, ADMIN_LOGIN e ADMIN_PASS
+
+# Subir a stack com o arquivo de variaveis correto
+docker compose --env-file .env.docker up -d --build
 ```
+
+> **Seguranca:** Antes de subir em producao, troque obrigatoriamente
+> `POSTGRES_PASSWORD`, `ADMIN_LOGIN` e `ADMIN_PASS` no `.env.docker`.
+> Os valores padrao no repositorio sao publicos e conhecidos.
 
 Isso sobe:
 
 - `dumarreco_db` (PostgreSQL com volume persistente);
-- `dumarreco_api`;
-- `dumarreco_web` (frontend build servido via Nginx).
+- `dumarreco_api` (Express na porta 3333, acessivel so internamente);
+- `dumarreco_web` (frontend Vite/React servido via Nginx na porta 80,
+  com proxy reverso para a API em `/api/`).
 
-Portas (padrao):
+Portas externas (padrao):
 
-- Web: `http://localhost:5173` (porta 80 no container)
-- API: `http://localhost:3333`
+- Web: `http://IP_DO_SERVIDOR` (porta 80)
+- API: acessivel apenas internamente via nginx — porta 3333 nao precisa estar aberta no firewall
 
 Smoke test (opcional):
 
@@ -168,7 +178,7 @@ Sempre rode backup antes:
 ```bash
 docker exec -i dumarreco_db pg_dump -U postgres -d controle_financeiro > backup-antes-update.sql
 git pull
-docker compose up -d --build
+docker compose --env-file .env.docker up -d --build
 ```
 
 ---
@@ -266,7 +276,7 @@ Antes de qualquer update:
 | Rodar backend dev | `cd backend && npm run dev` |
 | Rodar frontend dev | `npm run dev` |
 | Migrar banco local | `cd backend && npm run prisma:migrate` |
-| Subir Docker | `docker compose up -d --build` |
+| Subir Docker | `docker compose --env-file .env.docker up -d --build` |
 | Backup Docker DB | `docker exec -i dumarreco_db pg_dump -U postgres -d controle_financeiro > backup.sql` |
 
 ---
