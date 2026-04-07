@@ -1,4 +1,5 @@
 import type { Despesa } from './model'
+import { newId } from '../../utils/newId'
 
 const KEY_DESPESAS = 'controle-financeiro-despesas'
 const KEY_DESPESAS_DELETED_RECURRENCES = 'controle-financeiro-despesas-deleted-recurrences'
@@ -51,7 +52,7 @@ function seedExemplos(): Despesa[] {
   const base = `${ano}-${mes}`
   const exemplos: Despesa[] = [
     {
-      id: crypto.randomUUID(),
+      id: newId(),
       descricao: 'Conta de energia da loja',
       categoria: 'Energia eletrica',
       tipo: 'fixa',
@@ -69,7 +70,7 @@ function seedExemplos(): Despesa[] {
       atualizadoEm: nowIso,
     },
     {
-      id: crypto.randomUUID(),
+      id: newId(),
       descricao: 'Frete de materiais',
       categoria: 'Transporte',
       tipo: 'variavel',
@@ -86,7 +87,7 @@ function seedExemplos(): Despesa[] {
       atualizadoEm: nowIso,
     },
     {
-      id: crypto.randomUUID(),
+      id: newId(),
       descricao: 'Compra de material para revenda',
       categoria: 'Fornecedores de material',
       tipo: 'variavel',

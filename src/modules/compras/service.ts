@@ -14,6 +14,7 @@ import type {
 } from './model'
 import { parseNFeXmlToCompra, competenciaMes } from './nfeParser'
 import { comprasRepository } from './repository'
+import { newId } from '../../utils/newId'
 
 type CreateManualInput = {
   fornecedorNome: string
@@ -59,14 +60,14 @@ function upsertFornecedor(nome: string, cnpj?: string): Fornecedor {
     comprasRepository.setFornecedores(list.map((f) => (f.id === found.id ? updated : f)))
     return updated
   }
-  const novo: Fornecedor = { id: crypto.randomUUID(), cnpj, razaoSocial: nome, criadoEm: nowIso(), atualizadoEm: nowIso() }
+  const novo: Fornecedor = { id: newId(), cnpj, razaoSocial: nome, criadoEm: nowIso(), atualizadoEm: nowIso() }
   comprasRepository.setFornecedores([...list, novo])
   return novo
 }
 
 function logImport(entry: Omit<ImportacaoXmlLog, 'id' | 'dataHora'>) {
   const logs = comprasRepository.getLogs()
-  logs.push({ id: crypto.randomUUID(), dataHora: nowIso(), ...entry })
+  logs.push({ id: newId(), dataHora: nowIso(), ...entry })
   comprasRepository.setLogs(logs)
 }
 
@@ -86,7 +87,7 @@ function rollback(snapshot: {
 
 function createBoletoFromDup(compra: Compra, dup: { vencimento: string; valor: number; numero?: string }): Boleto {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     descricao: `Compra NF ${compra.nfeNumero ?? ''} - ${compra.fornecedorNome}${dup.numero ? ` (${dup.numero})` : ''}`.trim(),
     valor: Number(dup.valor.toFixed(2)),
     vencimento: dup.vencimento,
@@ -112,7 +113,7 @@ function createPurchaseFromNFe(parsed: NFeParsed, xmlRaw: string, usuario: strin
 
     const fornecedor = upsertFornecedor(parsed.emitenteNome, parsed.emitenteCnpj)
     const compra: Compra = {
-      id: crypto.randomUUID(),
+      id: newId(),
       fornecedorId: fornecedor.id,
       fornecedorNome: fornecedor.razaoSocial,
       fornecedorCnpj: fornecedor.cnpj,
@@ -140,7 +141,7 @@ function createPurchaseFromNFe(parsed: NFeParsed, xmlRaw: string, usuario: strin
     comprasRepository.setCompras([...snapshot.compras, compra])
 
     const itens = parsed.itens.map<CompraItem>((i) => ({
-      id: crypto.randomUUID(),
+      id: newId(),
       compraId: compra.id,
       descricao: i.descricao,
       ncm: i.ncm,
@@ -151,7 +152,7 @@ function createPurchaseFromNFe(parsed: NFeParsed, xmlRaw: string, usuario: strin
     comprasRepository.setItens([...snapshot.itens, ...itens])
 
     const doc: CompraDocumento = {
-      id: crypto.randomUUID(),
+      id: newId(),
       compraId: compra.id,
       tipo: 'xml_nfe',
       nomeArquivo: `nfe-${parsed.numero ?? 'sem-numero'}.xml`,
@@ -233,7 +234,7 @@ export const comprasService = {
 
     const fornecedor = upsertFornecedor(input.fornecedorNome.trim(), input.fornecedorCnpj?.trim())
     const compra: Compra = {
-      id: crypto.randomUUID(),
+      id: newId(),
       fornecedorId: fornecedor.id,
       fornecedorNome: fornecedor.razaoSocial,
       fornecedorCnpj: fornecedor.cnpj,
@@ -254,7 +255,7 @@ export const comprasService = {
 
     if (input.itens?.length) {
       const itens = input.itens.map<CompraItem>((i) => ({
-        id: crypto.randomUUID(),
+        id: newId(),
         compraId: compra.id,
         descricao: i.descricao,
         quantidade: i.quantidade,
@@ -285,7 +286,7 @@ export const comprasService = {
     for (let i = 0; i < input.parcelas; i++) {
       const venc = format(addMonths(base, i), 'yyyy-MM-dd')
       const boleto: Boleto = {
-        id: crypto.randomUUID(),
+        id: newId(),
         descricao: `${input.descricaoBase || compra.descricao || 'Compra'} (${i + 1}/${input.parcelas})`,
         valor: Number(valorParcela.toFixed(2)),
         vencimento: venc,

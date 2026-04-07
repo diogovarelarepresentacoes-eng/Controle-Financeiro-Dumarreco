@@ -4,6 +4,7 @@ import { despesasService as localService } from './service'
 import type { DashboardDespesas, Despesa, FiltrosDespesas } from './model'
 import { CATEGORIAS_DESPESA } from './model'
 import { format, parseISO, startOfMonth, subMonths } from 'date-fns'
+import { newId } from '../../utils/newId'
 
 type CriarDespesaPayload = Omit<Despesa, 'id' | 'criadoEm' | 'atualizadoEm' | 'recorrenciaOrigemId'>
 type AtualizarDespesaPayload = Partial<CriarDespesaPayload>
@@ -81,7 +82,7 @@ export const despesasController = {
       const now = new Date().toISOString()
       const despesa: Despesa = {
         ...payload,
-        id: crypto.randomUUID(),
+        id: newId(),
         recorrenciaOrigemId: undefined,
         criadoEm: now,
         atualizadoEm: now,

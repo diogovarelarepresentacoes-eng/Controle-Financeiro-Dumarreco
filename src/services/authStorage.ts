@@ -1,3 +1,5 @@
+import { newId } from '../utils/newId'
+
 export interface Usuario {
   id: string
   login: string
@@ -46,7 +48,7 @@ function salvarLista(lista: Usuario[]): void {
 export async function salvarUsuario(usuario: Omit<Usuario, 'id' | 'root'>): Promise<void> {
   const lista = await getUsuarios()
   const novo: Usuario = {
-    id: crypto.randomUUID(),
+    id: newId(),
     login: usuario.login.trim(),
     senha: await hashSenha(usuario.senha),
     root: false,

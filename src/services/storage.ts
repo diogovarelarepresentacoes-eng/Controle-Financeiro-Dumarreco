@@ -1,6 +1,7 @@
 import type { ContaBanco, Boleto, MovimentacaoBancaria, Venda, FaturamentoMensal } from '../types';
 import type { Despesa } from '../modules/despesas/model';
 import { formatMoney } from '../utils/formatMoney';
+import { newId } from '../utils/newId';
 
 const KEY_CONTAS = 'controle-financeiro-contas';
 const KEY_BOLETOS = 'controle-financeiro-boletos';
@@ -247,7 +248,7 @@ export function registrarBaixaBoleto(
 
   if (origem === 'conta_banco' && contaBancoId) {
     storageMovimentacoes.add({
-      id: crypto.randomUUID(),
+      id: newId(),
       contaBancoId,
       tipo: 'saida',
       valor: boleto.valor,
@@ -302,7 +303,7 @@ export function registrarVenda(venda: Venda): Venda {
   if (formaCartaoOuPix && venda.contaBancoId) {
     const valor = valorParaMovimentacao(venda);
     storageMovimentacoes.add({
-      id: crypto.randomUUID(),
+      id: newId(),
       contaBancoId: venda.contaBancoId,
       tipo: 'entrada',
       valor,
@@ -351,7 +352,7 @@ export function excluirVenda(vendaId: string): void {
 export function registrarPagamentoDespesa(despesa: Despesa): void {
   if (despesa.origemPagamento !== 'conta_banco' || !despesa.contaBancoId) return;
   storageMovimentacoes.add({
-    id: crypto.randomUUID(),
+    id: newId(),
     contaBancoId: despesa.contaBancoId,
     tipo: 'saida',
     valor: despesa.valor,

@@ -3,6 +3,7 @@ import type { ContaBanco as ContaBancoType, FormaPagamento } from '../types'
 import { contasBancoGateway } from '../services/contasBancoGateway'
 import { applyCurrencyMask, parseCurrencyFromInput } from '../utils/currencyMask'
 import { formatMoney } from '../utils/formatMoney'
+import { newId } from '../utils/newId'
 
 const FORMAS: FormaPagamento[] = ['pix', 'debito', 'credito']
 
@@ -82,7 +83,7 @@ export default function ContaBanco() {
       } else {
         const saldoInicial = parseCurrencyFromInput(saldoInicialDisplay)
         await contasBancoGateway.save({
-          id: crypto.randomUUID(),
+          id: newId(),
           ...form,
           saldoInicial,
           saldoAtual: saldoInicial,

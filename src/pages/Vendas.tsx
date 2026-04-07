@@ -8,6 +8,7 @@ import { maquinasCartaoGateway } from '../services/maquinasCartaoGateway'
 import { calcularValorLiquidoCartao } from '../services/taxaCartaoService'
 import { formatMoney } from '../utils/formatMoney'
 import { MODALIDADES_CARTAO } from '../utils/constants'
+import { newId } from '../utils/newId'
 
 const FORMAS: FormaPagamentoVenda[] = ['pix', 'dinheiro', 'cartao', 'cheque']
 
@@ -120,7 +121,7 @@ export default function Vendas() {
       const maquina = maquinas.find((m) => m.id === form.maquinaCartaoId)
       const { valorTaxa, valorLiquido } = calcularValorLiquidoCartao(valor, taxaConfigurada.taxaPercentual)
       venda = {
-        id: editingId ?? crypto.randomUUID(),
+        id: editingId ?? newId(),
         descricao: form.descricao.trim(),
         valor: valorLiquido,
         formaPagamento: 'cartao',
@@ -138,7 +139,7 @@ export default function Vendas() {
       }
     } else {
       venda = {
-        id: editingId ?? crypto.randomUUID(),
+        id: editingId ?? newId(),
         descricao: form.descricao.trim(),
         valor,
         formaPagamento: form.formaPagamento,

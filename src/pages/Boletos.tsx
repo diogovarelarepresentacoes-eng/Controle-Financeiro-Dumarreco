@@ -4,6 +4,7 @@ import { boletosGateway } from '../services/boletosGateway'
 import { applyCurrencyMask, parseCurrencyFromInput, formatCurrencyForInput } from '../utils/currencyMask'
 import { formatDateBR } from '../utils/date'
 import { formatMoney } from '../utils/formatMoney'
+import { newId } from '../utils/newId'
 
 export default function Boletos() {
   const [boletos, setBoletos] = useState<Boleto[]>([])
@@ -57,7 +58,7 @@ export default function Boletos() {
     } else {
       if (valor <= 0) return
       await boletosGateway.save({
-        id: crypto.randomUUID(),
+        id: newId(),
         descricao: form.descricao.trim(),
         valor,
         vencimento,
@@ -84,7 +85,7 @@ export default function Boletos() {
       venc.setMonth(venc.getMonth() + i)
       const vencStr = venc.toISOString().slice(0, 10)
       await boletosGateway.save({
-        id: crypto.randomUUID(),
+        id: newId(),
         descricao: `${formParcelado.descricao.trim()} (${i + 1}/${parcelas} - Cartão crédito)`,
         valor: Math.round(valorParcela * 100) / 100,
         vencimento: vencStr,

@@ -20,9 +20,6 @@ const localStorageMock = (() => {
 })()
 
 vi.stubGlobal('localStorage', localStorageMock)
-vi.stubGlobal('crypto', {
-  randomUUID: () => 'test-uuid-' + Math.random().toString(36).slice(2),
-})
 
 const originalEnv = import.meta.env
 vi.stubGlobal('import.meta.env', { ...originalEnv, VITE_API_BASE_URL: '' })

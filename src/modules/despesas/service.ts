@@ -3,6 +3,7 @@ import { despesasRepository } from './repository'
 import type { DashboardDespesas, Despesa, FiltrosDespesas, PeriodicidadeDespesa, StatusDespesa } from './model'
 import { CATEGORIAS_DESPESA } from './model'
 import { registrarPagamentoDespesa, reverterPagamentoDespesa } from '../../services/storage'
+import { newId } from '../../utils/newId'
 
 type CriarDespesaInput = Omit<Despesa, 'id' | 'criadoEm' | 'atualizadoEm' | 'recorrenciaOrigemId'>
 type AtualizarDespesaInput = Partial<CriarDespesaInput>
@@ -48,7 +49,7 @@ function gerarRecorrencias(list: Despesa[]): Despesa[] {
         const now = new Date().toISOString()
         resultado.push({
           ...mestre,
-          id: crypto.randomUUID(),
+          id: newId(),
           dataVencimento: proxima,
           dataPagamento: undefined,
           status: 'pendente',
@@ -118,7 +119,7 @@ export const despesasService = {
     const now = new Date().toISOString()
     const item: Despesa = {
       ...input,
-      id: crypto.randomUUID(),
+      id: newId(),
       status: statusNormalizado(input.status, input.dataPagamento),
       recorrenciaOrigemId: input.recorrente ? '' : undefined,
       criadoEm: now,

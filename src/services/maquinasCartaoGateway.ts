@@ -1,3 +1,5 @@
+import { newId } from '../utils/newId'
+
 export interface MaquinaCartao {
   id: string
   nome: string
@@ -66,7 +68,7 @@ function ensureMaquinaPadraoLocal(): LocalData {
   if (maquinas.length === 0) {
     const now = new Date().toISOString()
     const maquinaPadrao: MaquinaCartao = {
-      id: crypto.randomUUID(),
+      id: newId(),
       nome: 'Stone',
       adquirente: 'Stone',
       descricao: 'Máquina padrão',
@@ -77,7 +79,7 @@ function ensureMaquinaPadraoLocal(): LocalData {
     maquinas = [maquinaPadrao]
     taxas = TAXAS_PADRAO.map((t) => ({
       ...t,
-      id: crypto.randomUUID(),
+      id: newId(),
       maquinaCartaoId: maquinaPadrao.id,
       createdAt: now,
       updatedAt: now,
@@ -179,7 +181,7 @@ export const maquinasCartaoGateway = {
     const { maquinas, taxas } = ensureMaquinaPadraoLocal()
     const now = new Date().toISOString()
     const nova: MaquinaCartao = {
-      id: crypto.randomUUID(),
+      id: newId(),
       nome: input.nome,
       adquirente: input.adquirente,
       descricao: input.descricao,
@@ -262,7 +264,7 @@ export const maquinasCartaoGateway = {
     if (dup) throw new Error('Já existe taxa ativa para esta modalidade nesta máquina.')
     const now = new Date().toISOString()
     const nova: TaxaMaquinaCartao = {
-      id: crypto.randomUUID(),
+      id: newId(),
       maquinaCartaoId,
       ...input,
       ativo: true,

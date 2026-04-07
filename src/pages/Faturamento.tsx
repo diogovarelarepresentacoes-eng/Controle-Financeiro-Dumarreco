@@ -22,6 +22,7 @@ import { purchasesGateway } from '../services/purchasesGateway'
 import { despesasController } from '../modules/despesas/controller'
 import type { Despesa } from '../modules/despesas/model'
 import type { CompraComRelacionamentos } from '../modules/compras/model'
+import { newId } from '../utils/newId'
 
 const MESES_NOMES = [
   'JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO',
@@ -293,7 +294,7 @@ export default function Faturamento() {
       .filter((c) => c.compra.ativo && c.compra.competenciaMes === ym && !c.compra.temNotaFiscal)
       .reduce((s, c) => s + c.compra.valorTotal, 0)
     const item: FaturamentoMensalType = {
-      id: existente?.id ?? crypto.randomUUID(),
+      id: existente?.id ?? newId(),
       ano: modalMes.ano,
       mes: modalMes.mes,
       valorInventarioInicio: parseCurrencyFromInput(form.valorInventarioInicio),
