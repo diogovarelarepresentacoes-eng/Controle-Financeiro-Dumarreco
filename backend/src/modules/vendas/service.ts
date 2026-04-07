@@ -1,9 +1,10 @@
 import { prisma } from '../../infra/prismaClient'
 import type { Prisma } from '@prisma/client'
 import type { z } from 'zod'
-import type { createVendaSchema } from './schemas'
+import type { createVendaSchema, updateVendaSchema } from './schemas'
 
 type CreateInput = z.infer<typeof createVendaSchema>
+type UpdateInput = z.infer<typeof updateVendaSchema>
 type Tx = Prisma.TransactionClient
 
 function toJson(row: Record<string, unknown>) {
@@ -122,7 +123,7 @@ export const vendasService = {
     })
   },
 
-  async atualizar(id: string, input: CreateInput) {
+  async atualizar(id: string, input: UpdateInput) {
     return prisma.$transaction(async (tx) => {
       const antiga = await tx.venda.findUnique({ where: { id } })
       if (!antiga) throw new Error('Venda nao encontrada.')
@@ -134,23 +135,25 @@ export const vendasService = {
       const venda = await tx.venda.update({
         where: { id },
         data: {
-          descricao: input.descricao,
-          valor: input.valor,
-          formaPagamento: input.formaPagamento,
-          contaBancoId: input.contaBancoId ?? null,
-          data: input.data,
-          maquinaCartaoId: input.maquinaCartaoId ?? null,
-          maquinaCartaoNome: input.maquinaCartaoNome ?? null,
-          tipoPagamentoCartao: input.tipoPagamentoCartao ?? null,
-          quantidadeParcelas: input.quantidadeParcelas ?? null,
-          valorBruto: input.valorBruto ?? null,
-          taxaPercentualCartao: input.taxaPercentualCartao ?? null,
-          valorTaxaCartao: input.valorTaxaCartao ?? null,
-          valorLiquido: input.valorLiquido ?? null,
-          observacaoFinanceira: input.observacaoFinanceira ?? null,
+          ...(input.descricao !== undefined && { descricao: input.descricao }),
+          ...(input.valor !== undefined && { valor: input.valor }),
+          ...(input.formaPagamento !== undefined && { formaPagamento: input.formaPagamento }),
+          ...(input.contaBancoId !== undefined && { contaBancoId: input.contaBancoId ?? null }),
+          ...(input.data !== undefined && { data: input.data }),
+          ...(input.maquinaCartaoId !== undefined && { maquinaCartaoId: input.maquinaCartaoId ?? null }),
+          ...(input.maquinaCartaoNome !== undefined && { maquinaCartaoNome: input.maquinaCartaoNome ?? null }),
+          ...(input.tipoPagamentoCartao !== undefined && { tipoPagamentoCartao: input.tipoPagamentoCartao ?? null }),
+          ...(input.quantidadeParcelas !== undefined && { quantidadeParcelas: input.quantidadeParcelas ?? null }),
+          ...(input.valorBruto !== undefined && { valorBruto: input.valorBruto ?? null }),
+          ...(input.taxaPercentualCartao !== undefined && { taxaPercentualCartao: input.taxaPercentualCartao ?? null }),
+          ...(input.valorTaxaCartao !== undefined && { valorTaxaCartao: input.valorTaxaCartao ?? null }),
+          ...(input.valorLiquido !== undefined && { valorLiquido: input.valorLiquido ?? null }),
+          ...(input.observacaoFinanceira !== undefined && { observacaoFinanceira: input.observacaoFinanceira ?? null }),
         },
       })
-      await criarMovimentacaoVenda(tx, input, id)
+
+      const vendaCompleta = toJson(venda) as unknown as CreateInput
+      await criarMovimentacaoVenda(tx, vendaCompleta, id)
       return toJson(venda)
     })
   },
