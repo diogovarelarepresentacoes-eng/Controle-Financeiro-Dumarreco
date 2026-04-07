@@ -7,27 +7,31 @@ import { formatDateBR } from '../utils/date'
 import { formatMoney } from '../utils/formatMoney'
 import { computeSaldoDinheiro } from '../utils/saldoDinheiro'
 import { despesasController } from '../modules/despesas/controller'
+import type { Despesa } from '../modules/despesas/model'
 
 export default function BaixaBoleto() {
   const [pendentes, setPendentes] = useState<Boleto[]>([])
   const [allBoletos, setAllBoletos] = useState<Boleto[]>([])
   const [contas, setContas] = useState<ContaBanco[]>([])
   const [vendas, setVendas] = useState<Venda[]>([])
+  const [despesas, setDespesas] = useState<Despesa[]>([])
   const [selecionado, setSelecionado] = useState<Boleto | null>(null)
   const [origem, setOrigem] = useState<OrigemPagamento>('dinheiro')
   const [contaBancoId, setContaBancoId] = useState('')
 
   const load = async () => {
-    const [pend, todos, todasContas, v] = await Promise.all([
+    const [pend, todos, todasContas, v, d] = await Promise.all([
       boletosGateway.getPendentes(),
       boletosGateway.getAll(),
       contasBancoGateway.getAll(),
       vendasGateway.getAll(),
+      despesasController.listar(),
     ])
     setPendentes(pend)
     setAllBoletos(todos)
     setContas(todasContas.filter((c) => c.ativo))
     setVendas(v)
+    setDespesas(d)
   }
 
   useEffect(() => {
@@ -35,8 +39,6 @@ export default function BaixaBoleto() {
       await load()
     })()
   }, [])
-
-  const despesas = useMemo(() => despesasController.listar(), [allBoletos])
   const saldoDinheiro = useMemo(() => computeSaldoDinheiro(vendas, allBoletos, despesas), [vendas, allBoletos, despesas])
 
   const darBaixa = async () => {

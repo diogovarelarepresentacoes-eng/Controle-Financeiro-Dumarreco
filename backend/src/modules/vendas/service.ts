@@ -1,8 +1,10 @@
 import { prisma } from '../../infra/prismaClient'
+import type { Prisma } from '@prisma/client'
 import type { z } from 'zod'
 import type { createVendaSchema } from './schemas'
 
 type CreateInput = z.infer<typeof createVendaSchema>
+type Tx = Prisma.TransactionClient
 
 function toJson(row: Record<string, unknown>) {
   return {
@@ -51,10 +53,10 @@ function precisaMovimentacao(formaPagamento: string): boolean {
   return formaPagamento === 'pix' || formaPagamento === 'cartao' || formaPagamento === 'cheque'
 }
 
-async function criarMovimentacaoVenda(venda: CreateInput, vendaId: string) {
+async function criarMovimentacaoVenda(tx: Tx, venda: CreateInput, vendaId: string) {
   if (!precisaMovimentacao(venda.formaPagamento) || !venda.contaBancoId) return
   const valor = valorParaMovimentacao(venda)
-  await prisma.movimentacaoBancaria.create({
+  await tx.movimentacaoBancaria.create({
     data: {
       id: crypto.randomUUID(),
       contaBancoId: venda.contaBancoId,
@@ -65,21 +67,21 @@ async function criarMovimentacaoVenda(venda: CreateInput, vendaId: string) {
       data: venda.data,
     },
   })
-  await prisma.contaBanco.update({
+  await tx.contaBanco.update({
     where: { id: venda.contaBancoId },
     data: { saldoAtual: { increment: valor } },
   })
 }
 
-async function reverterMovimentacoesVenda(vendaId: string) {
-  const movs = await prisma.movimentacaoBancaria.findMany({ where: { vendaId } })
+async function reverterMovimentacoesVenda(tx: Tx, vendaId: string) {
+  const movs = await tx.movimentacaoBancaria.findMany({ where: { vendaId } })
   for (const m of movs) {
-    await prisma.contaBanco.update({
+    await tx.contaBanco.update({
       where: { id: m.contaBancoId },
       data: { saldoAtual: { decrement: m.valor } },
     })
   }
-  await prisma.movimentacaoBancaria.deleteMany({ where: { vendaId } })
+  await tx.movimentacaoBancaria.deleteMany({ where: { vendaId } })
 }
 
 export const vendasService = {
@@ -94,67 +96,73 @@ export const vendasService = {
   },
 
   async registrar(input: CreateInput) {
-    const vendaId = input.id ?? crypto.randomUUID()
-    const venda = await prisma.venda.create({
-      data: {
-        id: vendaId,
-        descricao: input.descricao,
-        valor: input.valor,
-        formaPagamento: input.formaPagamento,
-        contaBancoId: input.contaBancoId ?? null,
-        data: input.data,
-        maquinaCartaoId: input.maquinaCartaoId ?? null,
-        maquinaCartaoNome: input.maquinaCartaoNome ?? null,
-        tipoPagamentoCartao: input.tipoPagamentoCartao ?? null,
-        quantidadeParcelas: input.quantidadeParcelas ?? null,
-        valorBruto: input.valorBruto ?? null,
-        taxaPercentualCartao: input.taxaPercentualCartao ?? null,
-        valorTaxaCartao: input.valorTaxaCartao ?? null,
-        valorLiquido: input.valorLiquido ?? null,
-        observacaoFinanceira: input.observacaoFinanceira ?? null,
-      },
+    return prisma.$transaction(async (tx) => {
+      const vendaId = input.id ?? crypto.randomUUID()
+      const venda = await tx.venda.create({
+        data: {
+          id: vendaId,
+          descricao: input.descricao,
+          valor: input.valor,
+          formaPagamento: input.formaPagamento,
+          contaBancoId: input.contaBancoId ?? null,
+          data: input.data,
+          maquinaCartaoId: input.maquinaCartaoId ?? null,
+          maquinaCartaoNome: input.maquinaCartaoNome ?? null,
+          tipoPagamentoCartao: input.tipoPagamentoCartao ?? null,
+          quantidadeParcelas: input.quantidadeParcelas ?? null,
+          valorBruto: input.valorBruto ?? null,
+          taxaPercentualCartao: input.taxaPercentualCartao ?? null,
+          valorTaxaCartao: input.valorTaxaCartao ?? null,
+          valorLiquido: input.valorLiquido ?? null,
+          observacaoFinanceira: input.observacaoFinanceira ?? null,
+        },
+      })
+      await criarMovimentacaoVenda(tx, input, vendaId)
+      return toJson(venda)
     })
-    await criarMovimentacaoVenda(input, vendaId)
-    return toJson(venda)
   },
 
   async atualizar(id: string, input: CreateInput) {
-    const antiga = await prisma.venda.findUnique({ where: { id } })
-    if (!antiga) throw new Error('Venda nao encontrada.')
+    return prisma.$transaction(async (tx) => {
+      const antiga = await tx.venda.findUnique({ where: { id } })
+      if (!antiga) throw new Error('Venda nao encontrada.')
 
-    if (precisaMovimentacao(antiga.formaPagamento as string) && antiga.contaBancoId) {
-      await reverterMovimentacoesVenda(id)
-    }
+      if (precisaMovimentacao(antiga.formaPagamento as string) && antiga.contaBancoId) {
+        await reverterMovimentacoesVenda(tx, id)
+      }
 
-    const venda = await prisma.venda.update({
-      where: { id },
-      data: {
-        descricao: input.descricao,
-        valor: input.valor,
-        formaPagamento: input.formaPagamento,
-        contaBancoId: input.contaBancoId ?? null,
-        data: input.data,
-        maquinaCartaoId: input.maquinaCartaoId ?? null,
-        maquinaCartaoNome: input.maquinaCartaoNome ?? null,
-        tipoPagamentoCartao: input.tipoPagamentoCartao ?? null,
-        quantidadeParcelas: input.quantidadeParcelas ?? null,
-        valorBruto: input.valorBruto ?? null,
-        taxaPercentualCartao: input.taxaPercentualCartao ?? null,
-        valorTaxaCartao: input.valorTaxaCartao ?? null,
-        valorLiquido: input.valorLiquido ?? null,
-        observacaoFinanceira: input.observacaoFinanceira ?? null,
-      },
+      const venda = await tx.venda.update({
+        where: { id },
+        data: {
+          descricao: input.descricao,
+          valor: input.valor,
+          formaPagamento: input.formaPagamento,
+          contaBancoId: input.contaBancoId ?? null,
+          data: input.data,
+          maquinaCartaoId: input.maquinaCartaoId ?? null,
+          maquinaCartaoNome: input.maquinaCartaoNome ?? null,
+          tipoPagamentoCartao: input.tipoPagamentoCartao ?? null,
+          quantidadeParcelas: input.quantidadeParcelas ?? null,
+          valorBruto: input.valorBruto ?? null,
+          taxaPercentualCartao: input.taxaPercentualCartao ?? null,
+          valorTaxaCartao: input.valorTaxaCartao ?? null,
+          valorLiquido: input.valorLiquido ?? null,
+          observacaoFinanceira: input.observacaoFinanceira ?? null,
+        },
+      })
+      await criarMovimentacaoVenda(tx, input, id)
+      return toJson(venda)
     })
-    await criarMovimentacaoVenda(input, id)
-    return toJson(venda)
   },
 
   async excluir(id: string) {
-    const existente = await prisma.venda.findUnique({ where: { id } })
-    if (!existente) throw new Error('Venda nao encontrada.')
-    if (precisaMovimentacao(existente.formaPagamento) && existente.contaBancoId) {
-      await reverterMovimentacoesVenda(id)
-    }
-    await prisma.venda.delete({ where: { id } })
+    await prisma.$transaction(async (tx) => {
+      const existente = await tx.venda.findUnique({ where: { id } })
+      if (!existente) throw new Error('Venda nao encontrada.')
+      if (precisaMovimentacao(existente.formaPagamento) && existente.contaBancoId) {
+        await reverterMovimentacoesVenda(tx, id)
+      }
+      await tx.venda.delete({ where: { id } })
+    })
   },
 }

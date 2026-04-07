@@ -1,9 +1,11 @@
 import { prisma } from '../../infra/prismaClient'
+import type { Prisma } from '@prisma/client'
 import type { z } from 'zod'
 import type { createDespesaSchema, updateDespesaSchema } from './schemas'
 
 type CreateInput = z.infer<typeof createDespesaSchema>
 type UpdateInput = z.infer<typeof updateDespesaSchema>
+type Tx = Prisma.TransactionClient
 
 function toJson(row: Record<string, unknown>) {
   return {
@@ -27,6 +29,17 @@ function toJson(row: Record<string, unknown>) {
     criadoEm: (row.criadoEm as Date).toISOString(),
     atualizadoEm: (row.atualizadoEm as Date).toISOString(),
   }
+}
+
+async function reverterMovimentacoesDespesa(tx: Tx, despesaId: string) {
+  const movs = await tx.movimentacaoBancaria.findMany({ where: { despesaId } })
+  for (const m of movs) {
+    await tx.contaBanco.update({
+      where: { id: m.contaBancoId },
+      data: { saldoAtual: { increment: m.valor } },
+    })
+  }
+  await tx.movimentacaoBancaria.deleteMany({ where: { despesaId } })
 }
 
 export const despesasService = {
@@ -137,76 +150,77 @@ export const despesasService = {
   },
 
   async registrarPagamento(id: string, origemPagamento: 'dinheiro' | 'conta_banco', contaBancoId?: string, dataPagamento?: string) {
-    const despesa = await prisma.despesa.findUnique({ where: { id } })
-    if (!despesa) throw new Error('Despesa nao encontrada.')
+    return prisma.$transaction(async (tx) => {
+      const despesa = await tx.despesa.findUnique({ where: { id } })
+      if (!despesa) throw new Error('Despesa nao encontrada.')
 
-    const data = dataPagamento ?? new Date().toISOString().slice(0, 10)
-    const updated = await prisma.despesa.update({
-      where: { id },
-      data: {
-        status: 'pago',
-        dataPagamento: data,
-        origemPagamento,
-        contaBancoId: contaBancoId ?? null,
-      },
-    })
-
-    if (origemPagamento === 'conta_banco' && contaBancoId) {
-      await prisma.movimentacaoBancaria.create({
+      const data = dataPagamento ?? new Date().toISOString().slice(0, 10)
+      const updated = await tx.despesa.update({
+        where: { id },
         data: {
-          id: crypto.randomUUID(),
-          contaBancoId,
-          tipo: 'saida',
-          valor: despesa.valor,
-          descricao: `Despesa: ${despesa.descricao}`,
-          despesaId: id,
-          data,
+          status: 'pago',
+          dataPagamento: data,
+          origemPagamento,
+          contaBancoId: contaBancoId ?? null,
         },
       })
-      await prisma.contaBanco.update({
-        where: { id: contaBancoId },
-        data: { saldoAtual: { decrement: despesa.valor } },
-      })
-    }
 
-    return toJson(updated)
+      if (origemPagamento === 'conta_banco' && contaBancoId) {
+        await tx.movimentacaoBancaria.create({
+          data: {
+            id: crypto.randomUUID(),
+            contaBancoId,
+            tipo: 'saida',
+            valor: despesa.valor,
+            descricao: `Despesa: ${despesa.descricao}`,
+            despesaId: id,
+            data,
+          },
+        })
+        await tx.contaBanco.update({
+          where: { id: contaBancoId },
+          data: { saldoAtual: { decrement: despesa.valor } },
+        })
+      }
+
+      return toJson(updated)
+    })
   },
 
   async reverterPagamento(id: string) {
-    const despesa = await prisma.despesa.findUnique({ where: { id } })
-    if (!despesa) throw new Error('Despesa nao encontrada.')
+    return prisma.$transaction(async (tx) => {
+      const despesa = await tx.despesa.findUnique({ where: { id } })
+      if (!despesa) throw new Error('Despesa nao encontrada.')
 
-    if (despesa.origemPagamento === 'conta_banco' && despesa.contaBancoId) {
-      const movs = await prisma.movimentacaoBancaria.findMany({ where: { despesaId: id } })
-      for (const m of movs) {
-        await prisma.contaBanco.update({
-          where: { id: m.contaBancoId },
-          data: { saldoAtual: { increment: m.valor } },
-        })
+      if (despesa.origemPagamento === 'conta_banco' && despesa.contaBancoId) {
+        await reverterMovimentacoesDespesa(tx, id)
       }
-      await prisma.movimentacaoBancaria.deleteMany({ where: { despesaId: id } })
-    }
 
-    const updated = await prisma.despesa.update({
-      where: { id },
-      data: {
-        status: 'pendente',
-        dataPagamento: null,
-        origemPagamento: null,
-        contaBancoId: null,
-      },
+      const updated = await tx.despesa.update({
+        where: { id },
+        data: {
+          status: 'pendente',
+          dataPagamento: null,
+          origemPagamento: null,
+          contaBancoId: null,
+        },
+      })
+      return toJson(updated)
     })
-    return toJson(updated)
   },
 
   async delete(id: string) {
-    const existing = await prisma.despesa.findUnique({ where: { id } })
-    if (!existing) throw new Error('Despesa nao encontrada.')
-    await prisma.movimentacaoBancaria.deleteMany({ where: { despesaId: id } })
-    await prisma.despesa.delete({ where: { id } })
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.despesa.findUnique({ where: { id } })
+      if (!existing) throw new Error('Despesa nao encontrada.')
+      if (existing.status === 'pago' && existing.origemPagamento === 'conta_banco' && existing.contaBancoId) {
+        await reverterMovimentacoesDespesa(tx, id)
+      }
+      await tx.movimentacaoBancaria.deleteMany({ where: { despesaId: id } })
+      await tx.despesa.delete({ where: { id } })
+    })
   },
 
-  // Deleted recurrence markers
   async getDeletedRecurrenceMarkers() {
     return prisma.deletedRecurrenceMarker.findMany()
   },

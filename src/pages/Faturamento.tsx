@@ -18,8 +18,10 @@ import { boletosGateway } from '../services/boletosGateway'
 import { faturamentoGateway } from '../services/faturamentoGateway'
 import type { Boleto, FaturamentoMensal as FaturamentoMensalType, Venda } from '../types'
 import { applyCurrencyMask, parseCurrencyFromInput, formatCurrencyForInput } from '../utils/currencyMask'
-import { comprasController } from '../modules/compras/controller'
+import { purchasesGateway } from '../services/purchasesGateway'
 import { despesasController } from '../modules/despesas/controller'
+import type { Despesa } from '../modules/despesas/model'
+import type { CompraComRelacionamentos } from '../modules/compras/model'
 
 const MESES_NOMES = [
   'JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO',
@@ -159,20 +161,24 @@ export default function Faturamento() {
   const [anoSelecionado, setAnoSelecionado] = useState(anoAtual)
   const [vendas, setVendas] = useState<Venda[]>([])
   const [boletos, setBoletos] = useState<Boleto[]>([])
-  const [despesas, setDespesas] = useState(() => despesasController.listar())
+  const [despesas, setDespesas] = useState<Despesa[]>([])
+  const [compras, setCompras] = useState<CompraComRelacionamentos[]>([])
   const [faturamentoMensal, setFaturamentoMensal] = useState<FaturamentoMensalType[]>([])
 
   useEffect(() => {
     const load = async () => {
-      const [v, b, f] = await Promise.all([
+      const [v, b, f, d, c] = await Promise.all([
         vendasGateway.getAll(),
         boletosGateway.getAll(),
         faturamentoGateway.getAll(),
+        despesasController.listar(),
+        purchasesGateway.list({ tipoNota: 'todas', statusPagamento: 'todos' }),
       ])
       setVendas(v)
       setBoletos(b)
       setFaturamentoMensal(f)
-      setDespesas(despesasController.listar())
+      setDespesas(d)
+      setCompras(c)
     }
     load()
   }, [])
@@ -189,34 +195,35 @@ export default function Faturamento() {
   const formatPerc = (v: number) => `${(v * 100).toFixed(2)}%`
 
   const reload = useCallback(async () => {
-    const [v, b, f] = await Promise.all([
+    const [v, b, f, d, c] = await Promise.all([
       vendasGateway.getAll(),
       boletosGateway.getAll(),
       faturamentoGateway.getAll(),
+      despesasController.listar(),
+      purchasesGateway.list({ tipoNota: 'todas', statusPagamento: 'todos' }),
     ])
     setVendas(v)
     setBoletos(b)
     setFaturamentoMensal(f)
-    setDespesas(despesasController.listar())
+    setDespesas(d)
+    setCompras(c)
   }, [])
 
   const comprasResumoPorAno = useMemo(() => {
     const porAno = new Map<number, Map<number, ResumoComprasMes>>()
-    comprasController
-      .listar({ tipoNota: 'todas', statusPagamento: 'todos' })
-      .forEach(({ compra }) => {
-        if (!compra.ativo) return
-        const [ano, mes] = compra.competenciaMes.split('-').map(Number)
-        if (!ano || !mes) return
-        const mapMes = porAno.get(ano) ?? new Map<number, ResumoComprasMes>()
-        const atual = mapMes.get(mes) ?? { comNf: 0, semNf: 0 }
-        if (compra.temNotaFiscal) atual.comNf += compra.valorTotal
-        else atual.semNf += compra.valorTotal
-        mapMes.set(mes, atual)
-        porAno.set(ano, mapMes)
-      })
+    compras.forEach(({ compra }) => {
+      if (!compra.ativo) return
+      const [ano, mes] = compra.competenciaMes.split('-').map(Number)
+      if (!ano || !mes) return
+      const mapMes = porAno.get(ano) ?? new Map<number, ResumoComprasMes>()
+      const atual = mapMes.get(mes) ?? { comNf: 0, semNf: 0 }
+      if (compra.temNotaFiscal) atual.comNf += compra.valorTotal
+      else atual.semNf += compra.valorTotal
+      mapMes.set(mes, atual)
+      porAno.set(ano, mapMes)
+    })
     return porAno
-  }, [anoSelecionado, faturamentoMensal, boletos, vendas, despesas])
+  }, [compras])
 
   const comprasResumoAnoAtual = comprasResumoPorAno.get(anoSelecionado) ?? new Map<number, ResumoComprasMes>()
   const comprasResumoAnoAnterior = comprasResumoPorAno.get(anoSelecionado - 1) ?? new Map<number, ResumoComprasMes>()
@@ -279,11 +286,11 @@ export default function Faturamento() {
     if (!modalMes) return
     const existente = faturamentoMensal.find((f) => f.ano === modalMes.ano && f.mes === modalMes.mes)
     const ym = `${modalMes.ano}-${String(modalMes.mes).padStart(2, '0')}`
-    const comprasDoMes = comprasController
-      .listar({ mesCompetencia: ym, tipoNota: 'com_nf', statusPagamento: 'todos' })
+    const comprasDoMes = compras
+      .filter((c) => c.compra.ativo && c.compra.competenciaMes === ym && c.compra.temNotaFiscal)
       .reduce((s, c) => s + c.compra.valorTotal, 0)
-    const compraSemNota = comprasController
-      .listar({ mesCompetencia: ym, tipoNota: 'sem_nf', statusPagamento: 'todos' })
+    const compraSemNota = compras
+      .filter((c) => c.compra.ativo && c.compra.competenciaMes === ym && !c.compra.temNotaFiscal)
       .reduce((s, c) => s + c.compra.valorTotal, 0)
     const item: FaturamentoMensalType = {
       id: existente?.id ?? crypto.randomUUID(),

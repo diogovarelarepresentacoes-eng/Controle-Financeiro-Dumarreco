@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { formatMoney } from '../utils/formatMoney'
 import { format } from 'date-fns'
@@ -8,6 +8,7 @@ import {
   CATEGORIAS_DESPESA,
   FORMAS_PAGAMENTO_DESPESA,
   type CategoriaDespesa,
+  type DashboardDespesas,
   type Despesa,
   type PeriodicidadeDespesa,
   type StatusDespesa,
@@ -84,7 +85,7 @@ export default function Despesas() {
   const [anoDashboard, setAnoDashboard] = useState(String(competencia.ano))
 
   const load = async () => {
-    const list = despesasController.listar({
+    const list = await despesasController.listar({
       dataInicio: filtroDataInicio,
       dataFim: filtroDataFim,
       categoria: filtroCategoria,
@@ -104,10 +105,14 @@ export default function Despesas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroDataInicio, filtroDataFim, filtroCategoria, filtroStatus, filtroBusca])
 
-  const dashboard = useMemo(
-    () => despesasController.dashboardMensal(Number(anoDashboard), Number(mesDashboard)),
-    [anoDashboard, mesDashboard, despesas],
-  )
+  const [dashboard, setDashboard] = useState<DashboardDespesas>({
+    totalDespesasMes: 0, totalPagoMes: 0, totalPendenteMes: 0, totalAtrasadoMes: 0,
+    custoFixoMensal: 0, custoVariavelMensal: 0, totalProjetadoProximoMes: 0, categorias: [],
+  })
+  const loadDashboard = useCallback(async () => {
+    setDashboard(await despesasController.dashboardMensal(Number(anoDashboard), Number(mesDashboard)))
+  }, [anoDashboard, mesDashboard, despesas])
+  useEffect(() => { loadDashboard() }, [loadDashboard])
 
   const openNew = () => {
     setEditingId(null)
@@ -143,7 +148,7 @@ export default function Despesas() {
     setForm(formInicial)
   }
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     const valor = parseCurrencyFromInput(form.valor)
 
@@ -192,8 +197,8 @@ export default function Despesas() {
     }
 
     try {
-      if (editingId) despesasController.atualizar(editingId, payload)
-      else despesasController.criar(payload)
+      if (editingId) await despesasController.atualizar(editingId, payload)
+      else await despesasController.criar(payload)
       closeModal()
       load()
     } catch (err) {
@@ -211,7 +216,7 @@ export default function Despesas() {
     setPagarForm(pagarFormInicial)
   }
 
-  const submitPagar = (e: React.FormEvent) => {
+  const submitPagar = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!pagarModalDespesa) return
     if (!pagarForm.dataPagamento) {
@@ -227,7 +232,7 @@ export default function Despesas() {
       return
     }
     try {
-      despesasController.atualizar(pagarModalDespesa.id, {
+      await despesasController.atualizar(pagarModalDespesa.id, {
         status: 'pago',
         dataPagamento: pagarForm.dataPagamento,
         origemPagamento: pagarForm.origemPagamento,
@@ -240,10 +245,10 @@ export default function Despesas() {
     }
   }
 
-  const excluir = (id: string) => {
+  const excluir = async (id: string) => {
     if (!confirm('Deseja excluir esta despesa?')) return
     try {
-      despesasController.excluir(id)
+      await despesasController.excluir(id)
       load()
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Erro ao excluir despesa.')

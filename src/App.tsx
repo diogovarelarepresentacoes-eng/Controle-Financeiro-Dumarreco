@@ -117,6 +117,7 @@ function App() {
                         <Route path={ROTA_CRM_KANBAN} element={<CrmKanban />} />
                         <Route path={ROTA_CRM_METAS} element={<CrmMetas />} />
                         <Route path={ROTA_CRM_CONFIG} element={<CrmConfiguracoes />} />
+                        <Route path="*" element={<Navigate to="/" replace />} />
                       </Routes>
                     </Suspense>
                     </ErrorBoundary>

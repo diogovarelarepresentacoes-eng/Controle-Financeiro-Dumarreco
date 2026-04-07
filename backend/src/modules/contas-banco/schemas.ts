@@ -5,8 +5,8 @@ export const createContaBancoSchema = z.object({
   banco: z.string().min(1, 'Banco obrigatorio'),
   agencia: z.string().default(''),
   conta: z.string().default(''),
-  saldoInicial: z.number(),
-  saldoAtual: z.number(),
+  saldoInicial: z.coerce.number(),
+  saldoAtual: z.coerce.number(),
   formasAceitas: z.array(z.string()).default([]),
   ativo: z.boolean().default(true),
 })

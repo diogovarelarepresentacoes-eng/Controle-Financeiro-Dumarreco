@@ -1,9 +1,11 @@
 import { prisma } from '../../infra/prismaClient'
+import type { Prisma } from '@prisma/client'
 import type { z } from 'zod'
 import type { createBoletoSchema, updateBoletoSchema } from './schemas'
 
 type CreateInput = z.infer<typeof createBoletoSchema>
 type UpdateInput = z.infer<typeof updateBoletoSchema>
+type Tx = Prisma.TransactionClient
 
 function toJson(row: Record<string, unknown>) {
   return {
@@ -18,6 +20,17 @@ function toJson(row: Record<string, unknown>) {
     compraId: row.compraId ?? undefined,
     criadoEm: row.criadoEm,
   }
+}
+
+async function reverterMovimentacoesBoleto(tx: Tx, boletoId: string) {
+  const movs = await tx.movimentacaoBancaria.findMany({ where: { boletoId } })
+  for (const m of movs) {
+    await tx.contaBanco.update({
+      where: { id: m.contaBancoId },
+      data: { saldoAtual: { increment: m.valor } },
+    })
+  }
+  await tx.movimentacaoBancaria.deleteMany({ where: { boletoId } })
 }
 
 export const boletosService = {
@@ -76,75 +89,78 @@ export const boletosService = {
   },
 
   async registrarBaixa(id: string, origem: 'dinheiro' | 'conta_banco', contaBancoId?: string) {
-    const boleto = await prisma.boleto.findUnique({ where: { id } })
-    if (!boleto) throw new Error('Boleto nao encontrado.')
-    if (boleto.pago) throw new Error('Boleto ja esta pago.')
+    return prisma.$transaction(async (tx) => {
+      const boleto = await tx.boleto.findUnique({ where: { id } })
+      if (!boleto) throw new Error('Boleto nao encontrado.')
+      if (boleto.pago) throw new Error('Boleto ja esta pago.')
 
-    const dataPagamento = new Date().toISOString().slice(0, 10)
+      const dataPagamento = new Date().toISOString().slice(0, 10)
 
-    const updated = await prisma.boleto.update({
-      where: { id },
-      data: {
-        pago: true,
-        dataPagamento,
-        origemPagamento: origem,
-        contaBancoId: contaBancoId ?? null,
-      },
-    })
-
-    if (origem === 'conta_banco' && contaBancoId) {
-      await prisma.movimentacaoBancaria.create({
+      const updated = await tx.boleto.update({
+        where: { id },
         data: {
-          id: crypto.randomUUID(),
-          contaBancoId,
-          tipo: 'saida',
-          valor: boleto.valor,
-          descricao: `Pagamento boleto: ${boleto.descricao}`,
-          boletoId: id,
-          data: dataPagamento,
+          pago: true,
+          dataPagamento,
+          origemPagamento: origem,
+          contaBancoId: contaBancoId ?? null,
         },
       })
-      await prisma.contaBanco.update({
-        where: { id: contaBancoId },
-        data: { saldoAtual: { decrement: boleto.valor } },
-      })
-    }
 
-    return toJson(updated)
+      if (origem === 'conta_banco' && contaBancoId) {
+        await tx.movimentacaoBancaria.create({
+          data: {
+            id: crypto.randomUUID(),
+            contaBancoId,
+            tipo: 'saida',
+            valor: boleto.valor,
+            descricao: `Pagamento boleto: ${boleto.descricao}`,
+            boletoId: id,
+            data: dataPagamento,
+          },
+        })
+        await tx.contaBanco.update({
+          where: { id: contaBancoId },
+          data: { saldoAtual: { decrement: boleto.valor } },
+        })
+      }
+
+      return toJson(updated)
+    })
   },
 
   async reverterBaixa(id: string) {
-    const boleto = await prisma.boleto.findUnique({ where: { id } })
-    if (!boleto) throw new Error('Boleto nao encontrado.')
-    if (!boleto.pago) throw new Error('Boleto nao esta pago.')
+    return prisma.$transaction(async (tx) => {
+      const boleto = await tx.boleto.findUnique({ where: { id } })
+      if (!boleto) throw new Error('Boleto nao encontrado.')
+      if (!boleto.pago) throw new Error('Boleto nao esta pago.')
 
-    if (boleto.origemPagamento === 'conta_banco' && boleto.contaBancoId) {
-      await prisma.contaBanco.update({
-        where: { id: boleto.contaBancoId },
-        data: { saldoAtual: { increment: boleto.valor } },
-      })
-      await prisma.movimentacaoBancaria.deleteMany({
-        where: { boletoId: id },
-      })
-    }
+      if (boleto.origemPagamento === 'conta_banco' && boleto.contaBancoId) {
+        await reverterMovimentacoesBoleto(tx, id)
+      }
 
-    const updated = await prisma.boleto.update({
-      where: { id },
-      data: {
-        pago: false,
-        dataPagamento: null,
-        origemPagamento: null,
-        contaBancoId: null,
-      },
+      const updated = await tx.boleto.update({
+        where: { id },
+        data: {
+          pago: false,
+          dataPagamento: null,
+          origemPagamento: null,
+          contaBancoId: null,
+        },
+      })
+      return toJson(updated)
     })
-    return toJson(updated)
   },
 
   async delete(id: string) {
-    const existing = await prisma.boleto.findUnique({ where: { id } })
-    if (!existing) throw new Error('Boleto nao encontrado.')
-    await prisma.movimentacaoBancaria.deleteMany({ where: { boletoId: id } })
-    await prisma.boleto.delete({ where: { id } })
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.boleto.findUnique({ where: { id } })
+      if (!existing) throw new Error('Boleto nao encontrado.')
+      if (existing.pago && existing.origemPagamento === 'conta_banco' && existing.contaBancoId) {
+        await reverterMovimentacoesBoleto(tx, id)
+      }
+      await tx.movimentacaoBancaria.deleteMany({ where: { boletoId: id } })
+      await tx.boleto.delete({ where: { id } })
+    })
   },
 
   async saveAll(boletos: CreateInput[]) {

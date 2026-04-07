@@ -62,5 +62,10 @@ export const vendasGateway = {
     return this.excluir(id)
   },
 
-  getSaldoDinheiro: localGetSaldoDinheiro,
+  getSaldoDinheiro(): number {
+    if (USING_BACKEND) {
+      return 0
+    }
+    return localGetSaldoDinheiro()
+  },
 }

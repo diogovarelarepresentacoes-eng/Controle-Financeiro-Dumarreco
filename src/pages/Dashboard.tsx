@@ -69,8 +69,8 @@ export default function Dashboard() {
       setContas(c)
       setVendas(v)
       setBoletos(b)
-      setDespesasPendentes(despesasController.listar({ status: 'pendente' }))
-      setDespesasTodas(despesasController.listar())
+      setDespesasPendentes(await despesasController.listar({ status: 'pendente' }))
+      setDespesasTodas(await despesasController.listar())
     }
     load()
   }, [])

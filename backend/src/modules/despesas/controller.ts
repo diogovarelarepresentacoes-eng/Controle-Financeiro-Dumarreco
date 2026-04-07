@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express'
 import { despesasService } from './service'
+import { z } from 'zod'
 import { createDespesaSchema, updateDespesaSchema, pagamentoDespesaSchema, deletedRecurrenceMarkerSchema } from './schemas'
 
 export const despesasController = {
@@ -40,8 +41,12 @@ export const despesasController = {
   },
 
   async saveAll(req: Request, res: Response) {
+    const parsed = z.array(createDespesaSchema).safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Payload invalido.', details: parsed.error.flatten() })
+    }
     try {
-      await despesasService.saveAll(req.body)
+      await despesasService.saveAll(parsed.data)
       return res.status(204).send()
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao salvar despesas.' })

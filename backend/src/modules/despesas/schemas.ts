@@ -5,7 +5,7 @@ export const createDespesaSchema = z.object({
   descricao: z.string().min(1, 'Descricao obrigatoria'),
   categoria: z.string().min(1),
   tipo: z.string().min(1),
-  valor: z.number().positive(),
+  valor: z.coerce.number().positive(),
   dataVencimento: z.string().min(1),
   dataPagamento: z.string().nullish(),
   status: z.string().default('pendente'),

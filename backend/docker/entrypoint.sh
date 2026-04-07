@@ -4,7 +4,10 @@ set -e
 echo "Syncing database schema (safe mode - no data loss)..."
 npx prisma db push --skip-generate 2>&1 || {
   echo "WARNING: prisma db push failed (possibly destructive change). Trying migrate deploy..."
-  npx prisma migrate deploy 2>&1 || echo "WARNING: migrate deploy returned non-zero, continuing..."
+  npx prisma migrate deploy 2>&1 || {
+    echo "FATAL: Both db push and migrate deploy failed. Aborting."
+    exit 1
+  }
 }
 
 echo "Seeding admin user..."

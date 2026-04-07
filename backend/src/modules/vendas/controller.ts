@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express'
 import { vendasService } from './service'
-import { createVendaSchema } from './schemas'
+import { createVendaSchema, updateVendaSchema } from './schemas'
 
 export const vendasController = {
   async list(_req: Request, res: Response) {
@@ -28,7 +28,7 @@ export const vendasController = {
   },
 
   async atualizar(req: Request, res: Response) {
-    const parsed = createVendaSchema.safeParse(req.body)
+    const parsed = updateVendaSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload invalido.', details: parsed.error.flatten() })
     }
